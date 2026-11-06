@@ -67,6 +67,29 @@ func _run() -> void:
 	_check(game.actors[ids[0]].physics_interpolation_mode == Node.PHYSICS_INTERPOLATION_MODE_ON, "players are interpolated")
 	_check(game.match_camera.physics_interpolation_mode != Node.PHYSICS_INTERPOLATION_MODE_ON and not game.match_camera.is_physics_interpolated(), "camera is not interpolated")
 
+	# 2.5D: props and players cast floor shadows anchored at their visible base.
+	var crate: Node = null
+	for node in game.get_children():
+		if node.has_node("World/Crate"): crate = node.get_node("World/Crate")
+	_check(crate != null and crate.has_node("CastShadow"), "props cast shadows")
+	if crate != null and crate.has_node("CastShadow"):
+		var art: Sprite2D = crate.get_node("Sprite2D")
+		var shade: Sprite2D = crate.get_node("CastShadow")
+		var art_rect: Rect2 = art.get_global_transform() * art.get_rect()
+		var shade_rect: Rect2 = shade.get_global_transform() * shade.get_rect()
+		_check(shade_rect.position.y < art_rect.end.y and shade_rect.end.y > art_rect.end.y - 40.0, "prop shadow touches the prop's base")
+	_check(game.actors[ids[0]].has_node("CastShadow"), "players cast shadows")
+	# Seamless running: a blend frame appears while running and hides at rest.
+	var runner: CharacterBody2D = game.actors[ids[1]]
+	runner.facing = Vector2.RIGHT
+	runner._play("sprint", Vector2.RIGHT)
+	runner.sprite.play()
+	runner._update_run_polish()
+	_check(runner.step_blend != null and runner.step_blend.visible and runner.sprite.skew != 0.0, "running adds a blend frame and lean")
+	runner._play("idle", Vector2.RIGHT)
+	runner._update_run_polish()
+	_check(runner.step_blend != null and not runner.step_blend.visible and runner.sprite.offset == Vector2.ZERO, "blend and bounce clear at rest")
+
 	# Can impact burst and the screen-shake toggle.
 	game._spawn_can_impact(0.8)
 	_check(game.get_children().any(func(node: Node) -> bool: return node.get_script() == game.IMPACT_FX), "can impact burst spawns")

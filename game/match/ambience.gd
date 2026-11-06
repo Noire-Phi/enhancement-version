@@ -42,7 +42,20 @@ uniform float strength = 0.42;
 void fragment() {
 	vec2 offset = UV - 0.5;
 	offset.x *= 1.25;
-	COLOR = vec4(tint.rgb, smoothstep(0.38, 0.92, length(offset)) * strength);
+	// Deeper shade away from the upper-left sun, matching the cast shadows.
+	float away = clamp(dot(UV - 0.5, normalize(vec2(1.0, 1.0))) + 0.2, 0.0, 1.0) * 0.16;
+	COLOR = vec4(tint.rgb, smoothstep(0.38, 0.92, length(offset)) * strength + away);
+}
+"""
+
+const SUN_SHADER := """
+shader_type canvas_item;
+render_mode blend_add;
+uniform vec4 sun : source_color = vec4(1.0, 0.82, 0.5, 1.0);
+uniform float strength = 0.13;
+void fragment() {
+	float glow = 1.0 - smoothstep(0.0, 1.1, length((UV - vec2(0.0, -0.1)) * vec2(1.0, 1.4)));
+	COLOR = vec4(sun.rgb * glow * strength, 1.0);
 }
 """
 
@@ -96,6 +109,12 @@ func setup(level: Node2D, map_index: int, bounds: Rect2) -> void:
 	vignette.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	vignette.material = _material(VIGNETTE_SHADER)
 	screen.add_child(vignette)
+	var sun := ColorRect.new()
+	sun.name = "Sunlight"
+	sun.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	sun.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	sun.material = _material(SUN_SHADER)
+	screen.add_child(sun)
 	_sway_foliage(level)
 
 static func _material(code: String) -> ShaderMaterial:

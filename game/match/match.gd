@@ -9,6 +9,7 @@ const SCORE_POPUP = preload("res://game/match/score_popup.gd")
 const IMPACT_FX = preload("res://game/match/impact_fx.gd")
 const AMBIENCE = preload("res://game/match/ambience.gd")
 const BOUNCE_DUST = preload("res://scenes/sprint_dust.gd")
+const CAST_SHADOWS = preload("res://game/match/cast_shadows.gd")
 const THROWOFF_TITLE_SFX = preload("res://assets/audio/sfx/throwoff_title.wav")
 const THROWOFF_TICK_SFX = preload("res://assets/audio/sfx/throwoff_tick.wav")
 const THROWOFF_GO_SFX = preload("res://assets/audio/sfx/throwoff_go.wav")
@@ -120,6 +121,7 @@ func _ready() -> void:
 	# Keep the authored fence-aligned border at the World origin.
 	level.get_node("World/World Border").position = Vector2.ZERO
 	CATALOG.configure(level, LanSession.selected_map)
+	CAST_SHADOWS.add_to_props(level.get_node("World"))
 	add_child(level)
 	ambience = AMBIENCE.new()
 	ambience.setup(level, LanSession.selected_map, CAMERA_BOUNDS)
@@ -211,6 +213,7 @@ func _actor_added(actor: CharacterBody2D) -> void:
 	scores[actor.get_meta("peer_id")] = 0
 	stats[actor.get_meta("peer_id")] = {"hits": 0, "tags": 0, "returns": 0}
 	_interpolate(actor)
+	CAST_SHADOWS.add_to_actor(actor)
 
 func _world_inputs_enabled() -> bool:
 	return stage in ["throw_off", "preparation", "active"]

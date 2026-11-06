@@ -149,12 +149,16 @@ func _play(action: String, direction: Vector2) -> void:
 
 
 func _fit_motion_frame() -> void:
-	if motion_visible_height <= 0.0 or not sprite.sprite_frames:
+	_fit_frame(sprite, sprite.frame)
+
+
+func _fit_frame(target: AnimatedSprite2D, frame_index: int) -> void:
+	if motion_visible_height <= 0.0 or not target.sprite_frames:
 		return
-	var animation_name := String(sprite.animation)
+	var animation_name := String(target.animation)
 	if not ("idle_" in animation_name or "walk_" in animation_name or "sprint_" in animation_name):
 		return
-	var texture: Texture2D = sprite.sprite_frames.get_frame_texture(sprite.animation, sprite.frame)
+	var texture: Texture2D = target.sprite_frames.get_frame_texture(target.animation, frame_index)
 	if texture == null:
 		return
 	var id := texture.get_instance_id()
@@ -164,8 +168,57 @@ func _fit_motion_frame() -> void:
 	if bounds.size.y <= 0:
 		return
 	var fitted_scale := motion_visible_height / float(bounds.size.y)
-	sprite.scale = Vector2.ONE * fitted_scale
-	sprite.position = Vector2(0.0, -(float(bounds.end.y) - texture.get_size().y * 0.5) * fitted_scale)
+	target.scale = Vector2.ONE * fitted_scale
+	target.position = Vector2(0.0, -(float(bounds.end.y) - texture.get_size().y * 0.5) * fitted_scale)
+
+
+# Seamless running: most run cycles have only four drawn frames, so blend each
+# frame into the next and add a light stride bounce and forward lean. Local
+# presentation only; every peer computes it from the sprite it already shows.
+const STEP_BLEND := 0.55
+const STRIDE_BOUNCE := {"walk": 3.0, "sprint": 6.0}
+const RUN_LEAN := 0.09
+var step_blend: AnimatedSprite2D
+
+
+func _update_run_polish() -> void:
+	var name_text := String(sprite.animation)
+	var gait := "sprint" if name_text.begins_with("sprint_") else "walk" if name_text.begins_with("walk_") else ""
+	var running := gait != "" and sprite.visible and sprite.is_playing() and sprite.sprite_frames != null
+	if not running:
+		sprite.offset = Vector2.ZERO
+		sprite.skew = 0.0
+		if step_blend != null: step_blend.hide()
+		return
+	var count := sprite.sprite_frames.get_frame_count(sprite.animation)
+	var cycle := (float(sprite.frame) + sprite.frame_progress) / float(maxi(count, 1))
+	# Two footfalls per cycle; the body rises between them.
+	var lift: float = absf(sin(cycle * TAU)) * STRIDE_BOUNCE[gait]
+	sprite.offset = Vector2(0.0, -lift / maxf(absf(sprite.scale.y), 0.001))
+	var sideways := signf(facing.x) * (1.0 if absf(facing.x) > 0.3 else 0.0)
+	sprite.skew = -sideways * RUN_LEAN * (1.0 if gait == "sprint" else 0.5)
+	if count < 2:
+		return
+	if step_blend == null:
+		step_blend = AnimatedSprite2D.new()
+		step_blend.name = "StepBlend"
+		step_blend.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
+		sprite.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
+		add_child(step_blend)
+		move_child(step_blend, sprite.get_index() + 1)
+	step_blend.show()
+	if step_blend.sprite_frames != sprite.sprite_frames: step_blend.sprite_frames = sprite.sprite_frames
+	if step_blend.animation != sprite.animation: step_blend.animation = sprite.animation
+	step_blend.frame = (sprite.frame + 1) % count
+	step_blend.flip_h = sprite.flip_h
+	step_blend.rotation = sprite.rotation
+	step_blend.position = sprite.position
+	step_blend.scale = sprite.scale
+	_fit_frame(step_blend, step_blend.frame)
+	step_blend.offset = Vector2(0.0, -lift / maxf(absf(step_blend.scale.y), 0.001))
+	step_blend.skew = sprite.skew
+	step_blend.material = sprite.material
+	step_blend.modulate = Color(1, 1, 1, smoothstep(0.0, 1.0, sprite.frame_progress) * STEP_BLEND)
 
 
 func _movement_animation(action: String, direction_name: String) -> StringName:

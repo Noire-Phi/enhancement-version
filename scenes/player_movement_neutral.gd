@@ -253,6 +253,7 @@ func _keep_out_of_can_circle() -> void:
 
 func _process(_delta: float) -> void:
 	_refresh_possession_visual()
+	_update_run_polish()
 	# Replicas do not simulate physics, but their timing marker must animate smoothly.
 	if attack_state == AttackState.CHARGING and not LanSession.is_host():
 		_refresh_meter()
