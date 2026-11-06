@@ -27,6 +27,9 @@ unpacked so that `rife/rife-ncnn-vulkan.exe` and `rife/rife-v4.6/` sit beside th
 3. `scenes/locomotion_inbetweens.gd` slots them into every animation whose pairs are all
    present, at double the frame rate, so the stride timing is unchanged.
 
-Rejected and left on their drawn frames: Leonardo's and Kay's side/diagonal sprints
-(black trousers over large leg swings smear) and Bullcap (already 16 drawn frames;
-doubling produced faint cross-faded frames). Review every result at game scale.
+Rejected and left on their drawn frames: Bullcap (already 16 drawn frames; doubling
+produced faint cross-faded frames). Leonardo's and Kay's side/diagonal sprints smeared in
+RIFE (black trousers over large leg swings), so their `side_sprint_cycle_inbetween.png` and
+`sprint_diagonal_v2_inbetween.png` are SpriteCook drawings instead (8 frames, see
+docs/decisions.md). `new_roster_inbetween.py` leaves them alone, and they stay on the
+pass 2 skip list until that pass is re-run on them. Review every result at game scale.

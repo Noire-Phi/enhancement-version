@@ -27,8 +27,8 @@ func _run() -> void:
 				for action in ACTIONS:
 					var animation := StringName(action + "_" + direction)
 					var frames := attack.sprite_frames if action in ["aim", "throw"] else body.sprite_frames
-					# Walks and cardinal sprints are doubled twice (16 frames); diagonal/side sprints stay at 4 drawn frames.
-					var expected_count: int = 4 if (direction.contains("_") or direction in ["left", "right"]) and action == "sprint" else ACTIONS[action]
+					# Walks and cardinal sprints are doubled twice (16 frames); diagonal/side sprints have 8 drawn frames (SpriteCook in-betweens, no RIFE pass).
+					var expected_count: int = 8 if (direction.contains("_") or direction in ["left", "right"]) and action == "sprint" else ACTIONS[action]
 					if not frames.has_animation(animation) or frames.get_frame_count(animation) != expected_count:
 						problems.append("%s: %s" % [path, animation])
 						continue

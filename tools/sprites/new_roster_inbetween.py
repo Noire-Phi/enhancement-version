@@ -17,7 +17,8 @@ from PIL import Image
 
 import inbetween as ib
 
-SHEETS = ("walk_diagonal_v2", "sprint_diagonal_v2", "side_walk_cycle", "side_sprint_cycle")
+# Sprints are left out: their *_inbetween sheets are SpriteCook drawings that a rerun would overwrite.
+SHEETS = ("walk_diagonal_v2", "side_walk_cycle")
 GAP = 60  # transparent space between drawings so the region builder can split them
 
 
