@@ -80,13 +80,14 @@ func _ready() -> void:
 		name_label.size = Vector2(350, 45)
 		name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		stage.add_child(name_label)
-		var score := UI.label("%d POINTS" % int(member.score), 26)
+		var score := UI.label("%d POINT%s" % [int(member.score), "" if int(member.score) == 1 else "S"], 26)
 		score.position = Vector2(0, 110)
 		score.size = Vector2(320, 45)
 		block.add_child(score)
 	for rank in range(3, rankings.size()):
 		var member: Dictionary = rankings[rank]
-		_text("%d. %s   %d points" % [rank + 1, member.name, member.score], Vector2(200 + (rank - 3) * 760, 825), Vector2(760, 55), 26)
+		_text("%d. %s   %d point%s" % [rank + 1, member.name, member.score, "" if int(member.score) == 1 else "s"],Vector2(200 + (rank - 3) * 760, 825), Vector2(760, 55), 26)
+	_build_awards(rankings)
 	if LanSession.mode == "developer":
 		_text("Developer games do not affect saved statistics.", Vector2(300, 895), Vector2(1320, 40), 22)
 	var leave := UI.button("Main Menu", func() -> void:
@@ -96,6 +97,58 @@ func _ready() -> void:
 	leave.position = Vector2(760, 965)
 	leave.size = Vector2(400, 75)
 	add_child(leave)
+
+# Match awards: the player(s) with the most can hits, tags and safe returns.
+const AWARDS := [
+	{"key": "hits", "title": "SHARPSHOOTER", "unit": "can hit", "color": Color("2f7fcf")},
+	{"key": "tags", "title": "TAG MASTER", "unit": "tag", "color": Color("c5271d")},
+	{"key": "returns", "title": "SAFE HANDS", "unit": "safe return", "color": Color("1f8a4c")},
+]
+
+static func award_winners(rankings: Array, key: String) -> Dictionary:
+	var best := 0
+	var names: Array[String] = []
+	for member in rankings:
+		var value := int(member.get(key, 0))
+		if value <= 0:
+			continue
+		if value > best:
+			best = value
+			names.clear()
+		if value == best:
+			names.append(str(member.name))
+	return {"value": best, "names": names}
+
+func _build_awards(rankings: Array) -> void:
+	var column := VBoxContainer.new()
+	column.name = "Awards"
+	column.position = Vector2(1520, 300)
+	column.custom_minimum_size = Vector2(370, 0)
+	column.add_theme_constant_override("separation", 16)
+	add_child(column)
+	for award in AWARDS:
+		var winners := award_winners(rankings, award.key)
+		if winners.names.is_empty():
+			continue
+		var card := PanelContainer.new()
+		card.name = str(award.title).capitalize().replace(" ", "")
+		var style := UI.panel(award.color, 5)
+		style.content_margin_top = 12
+		style.content_margin_bottom = 12
+		card.add_theme_stylebox_override("panel", style)
+		column.add_child(card)
+		var copy := VBoxContainer.new()
+		copy.add_theme_constant_override("separation", 2)
+		card.add_child(copy)
+		var heading := UI.label(award.title, 20)
+		heading.add_theme_color_override("font_color", Color("ffe29a"))
+		copy.add_child(heading)
+		var who := UI.label(" & ".join(winners.names), 26)
+		who.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		who.custom_minimum_size.x = 320
+		copy.add_child(who)
+		var count: int = winners.value
+		copy.add_child(UI.label("%d %s%s" % [count, award.unit, "" if count == 1 else "s"], 18))
 
 func _text(copy: String, at: Vector2, dimensions: Vector2, font_size: int) -> void:
 	var label := UI.label(copy, font_size)

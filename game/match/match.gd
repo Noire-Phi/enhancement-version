@@ -5,6 +5,7 @@ const CATALOG = preload("res://game/maps/map_catalog.gd")
 const TAG_BURST = preload("res://game/match/tag_burst.gd")
 const SCOREBOARD = preload("res://game/match/scoreboard.gd")
 const SCORE_TOGGLE = preload("res://game/match/score_toggle.gd")
+const SCORE_POPUP = preload("res://game/match/score_popup.gd")
 const THROWOFF_TITLE_SFX = preload("res://assets/audio/sfx/throwoff_title.wav")
 const THROWOFF_TICK_SFX = preload("res://assets/audio/sfx/throwoff_tick.wav")
 const THROWOFF_GO_SFX = preload("res://assets/audio/sfx/throwoff_go.wav")
@@ -29,6 +30,15 @@ const TAG_RESET_SECONDS := TAG_NOTICE_SECONDS
 const CAN_START := Vector2(1450, 610)
 const TAYA_START := CAN_START + Vector2(-180, 0)
 const TAG_RESET_TAYA_START := CAN_START + Vector2(-115, 0)
+# The last seconds of a match tick audibly and pulse the timer red.
+const FINAL_COUNTDOWN_SECONDS := 10
+const FINAL_COUNTDOWN_COLOR := Color("ff4a3a")
+# Screen shake is presentation only; each peer shakes its own camera.
+const CAN_SHAKE_MIN := 5.0
+const CAN_SHAKE_MAX := 15.0
+const TAG_SHAKE := 12.0
+const SHAKE_DECAY := 42.0
+const SCORE_POPUP_HEIGHT := 150.0
 
 var stage := "loading"
 var remaining := 7.0
@@ -75,6 +85,12 @@ var can_sfx: AudioStreamPlayer
 var last_sfx_stage := "loading"
 var last_countdown := 4
 var last_can_state := 0
+# Host-only tallies of what earned each player's points, shown as awards on the results screen.
+var stats: Dictionary = {}
+var shown_scores: Dictionary = {}
+var last_final_tick := FINAL_COUNTDOWN_SECONDS + 1
+var phase_label_color := Color("fff5dc")
+var shake_strength := 0.0
 
 func _ready() -> void:
 	Music.play_music("lobby")
@@ -157,6 +173,7 @@ func _actor_added(actor: CharacterBody2D) -> void:
 	actor.arena_bounds = ARENA
 	actor.tag_requested.connect(_tag_requested.bind(actor))
 	scores[actor.get_meta("peer_id")] = 0
+	stats[actor.get_meta("peer_id")] = {"hits": 0, "tags": 0, "returns": 0}
 
 func _world_inputs_enabled() -> bool:
 	return stage in ["throw_off", "preparation", "active"]
@@ -256,7 +273,7 @@ func _physics_process(delta: float) -> void:
 						_add_point(taya_id)
 			elif actor.get_meta("returning", false) and actor.get_meta("left_safe", false) and actor.get_meta("retrieved", false) and not actor.is_taya and SAFE.has_point(actor.global_position):
 				actor.set_meta("returning", false)
-				_add_point(actor.get_meta("peer_id"))
+				_add_point(actor.get_meta("peer_id"), "returns")
 		if remaining <= 0.0:
 			_finish()
 	_update_hud()
@@ -407,7 +424,7 @@ func _can_hit(_target: Node2D, actor: CharacterBody2D, slipper: Node2D) -> void:
 	slipper.set_meta("skill_counted", true)
 	slipper.set_meta("outcome", true)
 	var id: int = actor.get_meta("peer_id")
-	_add_point(id)
+	_add_point(id, "hits")
 	if actor.has_thrower_special():
 		actor.set_skill_charge(actor.skill_charge + 1)
 	LanSession.publish_event({"kind": "hit", "player": id, "match_id": LanSession.match_id})
@@ -462,7 +479,7 @@ func _tag_requested(thrower: Node2D, guard: CharacterBody2D) -> void:
 	if not LanSession.is_host() or stage != "active" or tag_immunity > 0.0 or not guard.can_tag() or thrower.is_taya or SAFE.has_point(thrower.global_position):
 		return
 	var guard_id: int = guard.get_meta("peer_id")
-	_add_point(guard_id)
+	_add_point(guard_id, "tags")
 	guard.flash_hit()
 	thrower.flash_hit()
 	# Separate bodies along the court before transferring roles; neither player is stunned.
@@ -548,9 +565,33 @@ func _spawn_tag_burst(position: Vector2) -> void:
 	burst.position = position + Vector2(0, -55)
 	burst.z_index = 30
 	add_child(burst)
+	_shake(TAG_SHAKE)
 
-func _add_point(id: int) -> void:
+func _add_point(id: int, kind := "") -> void:
 	scores[id] = int(scores.get(id, 0)) + 1
+	if kind == "":
+		return
+	var entry: Dictionary = stats.get(id, {"hits": 0, "tags": 0, "returns": 0})
+	entry[kind] = int(entry.get(kind, 0)) + 1
+	stats[id] = entry
+
+func _shake(strength: float) -> void:
+	shake_strength = maxf(shake_strength, strength)
+
+func _update_score_popups() -> void:
+	for id in scores:
+		var now := int(scores[id])
+		var before := int(shown_scores.get(id, now))
+		shown_scores[id] = now
+		if now <= before or not actors.has(id) or stage not in ["active", "tag_reset"]:
+			continue
+		var actor: Node2D = actors[id]
+		var popup := SCORE_POPUP.new()
+		popup.text = "+%d" % (now - before)
+		popup.color = LanSession.member(id).get("color", Color("ffe29a"))
+		popup.position = actor.global_position + Vector2(0, -SCORE_POPUP_HEIGHT)
+		popup.z_index = 40
+		add_child(popup)
 
 func _match_event(event: Dictionary) -> void:
 	if event.get("kind") == "hit" and event.get("player") == LanSession.local_id() and event.get("match_id") == LanSession.match_id and LanSession.mode in ["lan", "online"]:
@@ -562,7 +603,8 @@ func _finish() -> void:
 	stage = "finished"
 	var rankings: Array = []
 	for member in LanSession.players:
-		rankings.append({"id": member.id, "name": member.name, "score": scores.get(member.id, 0), "color": member.color, "character": member.character})
+		var tally: Dictionary = stats.get(member.id, {})
+		rankings.append({"id": member.id, "name": member.name, "score": scores.get(member.id, 0), "color": member.color, "character": member.character, "hits": int(tally.get("hits", 0)), "tags": int(tally.get("tags", 0)), "returns": int(tally.get("returns", 0))})
 	rankings.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.score > b.score if a.score != b.score else a.id < b.id)
 	LanSession.finish_match(rankings)
 
@@ -624,6 +666,7 @@ func _build_hud() -> void:
 	phase_label.position = Vector2(-650, 35)
 	phase_label.size = Vector2(1300, 60)
 	screen.add_child(phase_label)
+	phase_label_color = screen.theme.get_color("font_color", "Label")
 	role_status_label = UI.label("", 32)
 	role_status_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	role_status_label.position = Vector2(-430, 98)
@@ -705,6 +748,9 @@ func _update_hud() -> void:
 	var time_text := "%d:%02d" % [int(ceil(remaining)) / 60, int(ceil(remaining)) % 60]
 	phase_label.text = "WAITING FOR PLAYERS TO LOAD" if stage == "loading" else "THROW OFF INCOMING" if stage in ["intro", "run_to_line"] else "WAITING FOR SLIPPERS" if stage == "throw_off" and remaining <= 0.0 else "THROW OFF  " + time_text if stage == "throw_off" else "INITIAL TAYA" if stage == "throw_off_result" else "TAYA PREPARATION  " + time_text if stage == "preparation" else "RETURN TO THE LINE" if stage == "tag_reset" else "MATCH  " + time_text
 	phase_label.visible = stage != "intro" and stage != "throw_off_result"
+	var final_seconds := stage == "active" and remaining > 0.0 and remaining <= FINAL_COUNTDOWN_SECONDS
+	var pulse := 0.5 + 0.5 * sin(LanSession.clock_time() * TAU * 2.0) if final_seconds else 0.0
+	phase_label.add_theme_color_override("font_color", phase_label_color.lerp(FINAL_COUNTDOWN_COLOR, 0.55 + 0.45 * pulse) if final_seconds else phase_label_color)
 	_refresh_scoreboard_visibility()
 	var own: Node2D = actors.get(LanSession.local_id())
 	var tag_wait: float = own.tag_delay_remaining() if own != null else 0.0
@@ -797,12 +843,22 @@ func _update_match_sfx() -> void:
 			tick_sfx.pitch_scale = 1.0 + float(3 - count) * 0.14
 			tick_sfx.play()
 			last_countdown = count
+	if stage == "active" and remaining > 0.0 and remaining <= FINAL_COUNTDOWN_SECONDS:
+		var second := ceili(remaining)
+		if second < last_final_tick:
+			# Rise in pitch toward the buzzer.
+			tick_sfx.pitch_scale = 1.0 + float(FINAL_COUNTDOWN_SECONDS - second) * 0.05
+			tick_sfx.play()
+			last_final_tick = second
+	elif stage == "active":
+		last_final_tick = FINAL_COUNTDOWN_SECONDS + 1
 	if can.state != last_can_state:
 		if last_can_state == can.State.STANDING and can.state == can.State.TOPPLED and can.hit_flash_remaining > 0.0:
 			var strength: float = clampf(can.impact_audio_strength, 0.0, 1.0)
 			can_sfx.volume_db = lerpf(-7.0, -2.0, strength)
 			can_sfx.pitch_scale = lerpf(0.9, 1.08, strength)
 			can_sfx.play()
+			_shake(lerpf(CAN_SHAKE_MIN, CAN_SHAKE_MAX, strength))
 		last_can_state = can.state
 
 
@@ -819,6 +875,7 @@ func _process(delta: float) -> void:
 	_update_match_sfx()
 	_update_intro_visual()
 	_update_tag_announcement()
+	_update_score_popups()
 	_update_camera(delta)
 
 func _update_tag_announcement() -> void:
@@ -893,6 +950,8 @@ func _update_camera(delta: float) -> void:
 	var weight := 1.0 - exp(-delta / (0.16 if following_throw else 0.26))
 	match_camera.position = match_camera.position.lerp(focus, weight)
 	match_camera.zoom = match_camera.zoom.lerp(Vector2.ONE * target_zoom, weight)
+	shake_strength = move_toward(shake_strength, 0.0, SHAKE_DECAY * delta)
+	match_camera.offset = Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * shake_strength if shake_strength > 0.0 else Vector2.ZERO
 
 func _update_intro_visual() -> void:
 	if intro_shade == null:

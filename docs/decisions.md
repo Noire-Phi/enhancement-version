@@ -395,3 +395,13 @@ Record each resolved decision here with its date and rationale.
 - The main-menu gear opens a Controls screen. Keyboard/mouse and controller layouts are stored separately in the existing profile file, and each gameplay action can be rebound. Duplicate bindings swap the old assignment. A chosen controller falls back to keyboard/mouse while disconnected and resumes after reconnection.
 - Controller defaults: left stick movement, right stick aim, left trigger sprint, right trigger hold/release throw, right bumper special or Taya stun, A slipper pickup, and B lunge. Controller aim holds its last stick direction when released. Windows handles Bluetooth pairing; the game binds to the first connected controller on each PC. Gameplay and LAN packet formats are unchanged.
 - Godot 4.7.2 passed `tests/controller_controls_smoke.gd` and a rendered Settings review at `tests/settings_preview.png`. Physical controller feel and cross-PC LAN play remain to be checked.
+
+## Enhancement version: match feedback and awards — 2026-11-06
+
+- This repository is a separate enhancement copy of Can Clash; the main repository is unchanged.
+- A rising "+N" in the scorer's color appears over a player whenever their match score goes up. Every peer draws it from the score changes it already receives in snapshots, so nothing new is sent.
+- In the last ten seconds of a match the timer pulses red and a tick plays each second, rising in pitch.
+- The local camera shakes briefly when the can is knocked down (stronger for harder hits) and when a tag hands over the Taya role. This is presentation only.
+- The host now counts each player's can hits, tags and safe returns and adds them to the final rankings. The results screen shows Sharpshooter, Tag Master and Safe Hands award cards; ties are shared and an award with no count is hidden. Results also say "1 point" instead of "1 points".
+- LAN/online protocol identifiers are unchanged: rankings gain extra dictionary keys, and snapshots are untouched.
+- Godot 4.7.2 passed `tests/enhancements_smoke.gd`. Tag reset, match camera, match sounds, gameplay rules, guard circle and new-roster match checks pass as before. `adjustments_smoke`, `possession_rules_smoke` and `skill_throw_smoke` fail identically on the original code, so those failures predate this change. Physical LAN play is unverified.
