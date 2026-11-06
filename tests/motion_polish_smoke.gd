@@ -26,8 +26,9 @@ func _check() -> void:
 					actor._play(action, motion)
 					if direction == "left":
 						assert(actor.sprite.flip_h, "The right-facing side gait must mirror for left movement")
-					assert(actor.sprite.sprite_frames.get_frame_count(actor.sprite.animation) == 4)
-					for frame in range(4):
+					# Enhanced sheets: the four drawn poses plus four in-betweens.
+					assert(actor.sprite.sprite_frames.get_frame_count(actor.sprite.animation) == 8)
+					for frame in range(8):
 						actor.sprite.frame = frame
 						actor._fit_polished_frame()
 						_check_frame(actor.sprite)

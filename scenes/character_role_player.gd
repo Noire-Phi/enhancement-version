@@ -71,15 +71,18 @@ func _normalized_frames(source: SpriteFrames) -> SpriteFrames:
 			var sheet := relaxed_diagonal if diagonal else relaxed_cardinal
 			# These sheets use the same row order as the authored release frames.
 			var row := ["down_left", "up_left", "up_right", "down_right"].find(lookup) if diagonal else ["down", "left", "up", "right"].find(lookup)
+			# Five rows of near-square cells; enhanced sheets hold 8 frames per row
+			# (drawn poses plus in-betweens), so speed scales to keep the stride.
+			var columns := maxi(1, roundi(sheet.get_width() / (sheet.get_height() / 5.0 * 1.025)))
 			for name_prefix in ["", "taya_"]:
 				for action in (["idle", "walk", "sprint"] if name_prefix == "" else ["walk", "sprint"]):
 					var name := StringName(name_prefix + action + "_" + direction)
 					result.clear(name)
-					result.set_animation_speed(name, 1.0 if action == "idle" else 11.0 if action == "sprint" else 8.0)
-					for frame in ([0] if action == "idle" else [0, 1, 2, 3]):
+					result.set_animation_speed(name, 1.0 if action == "idle" else (11.0 if action == "sprint" else 8.0) * columns / 4.0)
+					for frame in ([0] if action == "idle" else range(columns)):
 						var texture := AtlasTexture.new()
 						texture.atlas = sheet
-						var cell := Vector2(sheet.get_width() / 4.0, sheet.get_height() / 5.0)
+						var cell := Vector2(sheet.get_width() / float(columns), sheet.get_height() / 5.0)
 						texture.region = Rect2(Vector2(frame, row) * cell + Vector2(0, 12), cell - Vector2(0, 12))
 						texture.margin = Rect2(0, 12, 0, 12)
 						texture.filter_clip = true
@@ -116,12 +119,15 @@ func _install_polished_frames(frames: SpriteFrames, direction: String) -> void:
 		var sheet := side_walk_sheet if action == "walk" else side_sprint_sheet
 		if sheet == null:
 			continue
+		# Side sheets are one row of 3:4 cells; enhanced sheets carry 8 frames
+		# (originals plus in-betweens), so the rate scales to keep the same stride.
+		var columns := maxi(1, roundi(sheet.get_width() / (sheet.get_height() * 0.75)))
 		for prefix in ["", "taya_"]:
 			var name := StringName(prefix + action + "_" + direction)
 			frames.clear(name)
-			frames.set_animation_speed(name, 6.0 if action == "walk" else 8.0)
-			for column in range(4):
-				frames.add_frame(name, _polished_cell(sheet, column, 0, 4, 1))
+			frames.set_animation_speed(name, (6.0 if action == "walk" else 8.0) * columns / 4.0)
+			for column in range(columns):
+				frames.add_frame(name, _polished_cell(sheet, column, 0, columns, 1))
 
 
 func _polished_cell(sheet: Texture2D, column: int, row: int, columns: int, rows: int) -> AtlasTexture:

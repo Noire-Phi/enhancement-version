@@ -27,7 +27,8 @@ func _run() -> void:
 				for action in ACTIONS:
 					var animation := StringName(action + "_" + direction)
 					var frames := attack.sprite_frames if action in ["aim", "throw"] else body.sprite_frames
-					var expected_count: int = 4 if (direction.contains("_") or direction in ["left", "right"]) and action in ["walk", "sprint"] else ACTIONS[action]
+					# Diagonal and side walks gained generated in-betweens (8 frames); those sprints stay 4.
+					var expected_count: int = 4 if (direction.contains("_") or direction in ["left", "right"]) and action == "sprint" else ACTIONS[action]
 					if not frames.has_animation(animation) or frames.get_frame_count(animation) != expected_count:
 						problems.append("%s: %s" % [path, animation])
 						continue

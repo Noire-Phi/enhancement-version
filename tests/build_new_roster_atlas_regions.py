@@ -16,9 +16,11 @@ ROOT = Path(__file__).resolve().parents[1] / "assets/characters/sprites/new_rost
 SHEETS = ("carry_cardinal", "carry_diagonal", "taya_stun_cardinal", "taya_stun_diagonal")
 MOTION_SHEETS = ("idle_cardinal", "idle_diagonal", "reaction_cardinal",
                  "reaction_diagonal", "walk_cardinal",
-                 "walk_cardinal_inbetween", "walk_diagonal_v2", "sprint_cardinal",
-                 "sprint_cardinal_inbetween", "sprint_diagonal_v2")
-SIDE_SHEETS = ("side_walk_cycle", "side_sprint_cycle")
+                 "walk_cardinal_inbetween", "walk_diagonal_v2", "walk_diagonal_v2_inbetween",
+                 "sprint_cardinal", "sprint_cardinal_inbetween", "sprint_diagonal_v2")
+# *_inbetween side sheets are RIFE-generated (enhancement version); they share
+# their source cycle's canvas so both drawings pad identically.
+SIDE_SHEETS = ("side_walk_cycle", "side_walk_cycle_inbetween", "side_sprint_cycle")
 
 
 def spans(values: np.ndarray, minimum: int) -> list[tuple[int, int]]:
@@ -53,12 +55,16 @@ def regions(path: Path, expected_rows: int = 4, expected_columns: int = 4) -> di
 
 
 if __name__ == "__main__":
-    atlas = {character: {sheet: regions(ROOT / character / f"{sheet}.png", 2 if sheet.endswith("_v2") else 4)
+    atlas = {character: {sheet: regions(ROOT / character / f"{sheet}.png", 2 if "_v2" in sheet else 4)
                          for sheet in SHEETS + MOTION_SHEETS}
              for character in ("leonardo", "kay")}
     for character in atlas:
         for sheet in SIDE_SHEETS:
             atlas[character][sheet] = regions(ROOT / character / f"{sheet}.png", 1, 4)
+        side = [atlas[character][sheet] for sheet in ("side_walk_cycle", "side_walk_cycle_inbetween")]
+        shared = [max(entry["canvas"][axis] for entry in side) for axis in (0, 1)]
+        for entry in side:
+            entry["canvas"] = shared
         for action in ("carry", "taya_stun"):
             canvas = [max(atlas[character][f"{action}_{view}"]["canvas"][axis]
                           for view in ("cardinal", "diagonal"))

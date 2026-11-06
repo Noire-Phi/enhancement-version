@@ -218,7 +218,9 @@ func _update_run_polish() -> void:
 	step_blend.offset = Vector2(0.0, -lift / maxf(absf(step_blend.scale.y), 0.001))
 	step_blend.skew = sprite.skew
 	step_blend.material = sprite.material
-	step_blend.modulate = Color(1, 1, 1, smoothstep(0.0, 1.0, sprite.frame_progress) * STEP_BLEND)
+	# Cycles with drawn or generated in-betweens need only a light touch.
+	var strength := STEP_BLEND if count <= 4 else STEP_BLEND * 0.4
+	step_blend.modulate = Color(1, 1, 1, smoothstep(0.0, 1.0, sprite.frame_progress) * strength)
 
 
 func _movement_animation(action: String, direction_name: String) -> StringName:

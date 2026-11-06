@@ -120,25 +120,29 @@ func _character_frames() -> SpriteFrames:
 			var cells: Array[Texture2D] = []
 			var heights: Array[float] = []
 			var geometry_key := key
+			var source_key := key
+			var row: int = (0 if direction in ["down_right", "down_left"] else 1) if diagonal else CARDINAL.find(direction)
 			if direction in ["left", "right"]:
 				# The side-view cycle includes both shoe contacts and passing steps.
-				var side_key: String = "side_" + action + "_cycle"
-				var side_sheet := load(path + side_key + ".png") as Texture2D
-				for step in range(4):
-					cells.append(_grid_cell(side_sheet, side_key, step, 0))
-					heights.append(_cell_height(side_key, step, 0))
-				geometry_key = side_key
-			else:
-				var row: int = (0 if direction in ["down_right", "down_left"] else 1) if diagonal else CARDINAL.find(direction)
-				for column in range(4):
-					cells.append(_grid_cell(sheet, key, column, row))
-					heights.append(_cell_height(key, column, row))
-					if not diagonal:
-						var inbetween_key := key + "_inbetween"
-						var inbetween_sheet := load(path + inbetween_key + ".png") as Texture2D
-						cells.append(_grid_cell(inbetween_sheet, inbetween_key, column, row))
-						heights.append(_cell_height(inbetween_key, column, row))
+				source_key = "side_" + action + "_cycle"
+				sheet = load(path + source_key + ".png") as Texture2D
+				row = 0
+				geometry_key = source_key
+			# Cardinal in-betweens are hand-drawn; diagonal and side walk ones were
+			# generated for the enhancement version. Any listed sheet doubles the frames.
+			var inbetween_key := source_key + "_inbetween"
+			var has_inbetween: bool = atlas_regions[art_name].has(inbetween_key)
+			var inbetween_sheet := load(path + inbetween_key + ".png") as Texture2D if has_inbetween else null
+			for column in range(4):
+				cells.append(_grid_cell(sheet, source_key, column, row))
+				heights.append(_cell_height(source_key, column, row))
+				if has_inbetween:
+					cells.append(_grid_cell(inbetween_sheet, inbetween_key, column, row))
+					heights.append(_cell_height(inbetween_key, column, row))
 			var speed := 6.0 if action == "walk" and (diagonal or direction in ["left", "right"]) else 7.0 if action == "sprint" and (diagonal or direction in ["left", "right"]) else 8.0 if action == "walk" else 11.0
+			# Keep the stride rate where generated in-betweens doubled a 4-frame cycle.
+			if has_inbetween and (diagonal or direction in ["left", "right"]):
+				speed *= 2.0
 			_add(result, action + "_" + direction, cells, true, speed)
 			_record_geometry(action + "_" + direction, geometry_key, heights)
 		# Thrower release uses its separately authored directional atlas.
