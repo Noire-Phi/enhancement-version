@@ -6,6 +6,8 @@ var player_color_index := 0
 var headwear_index := 0
 var accessory_index := 0
 var tutorial_seen := false
+# Reduced-motion option: turns off camera shake in matches.
+var screen_shake := true
 var statistics := {"wins": 0, "losses": 0, "successful_throws": 0, "can_knockdowns": 0}
 var completed_matches: Array = []
 const CONTROL_ACTIONS := ["up", "down", "left", "right", "aim_up", "aim_down", "aim_left", "aim_right", "sprint", "throw", "special", "interact", "lunge"]
@@ -165,6 +167,7 @@ func load_profile() -> void:
 	headwear_index = clampi(int(config.get_value("player", "headwear", 0)), 0, 1)
 	accessory_index = clampi(int(config.get_value("player", "accessory", 0)), 0, 2)
 	tutorial_seen = bool(config.get_value("player", "tutorial_seen", false))
+	screen_shake = bool(config.get_value("display", "screen_shake", true))
 	for key in statistics:
 		statistics[key] = maxi(0, int(config.get_value("statistics", key, 0)))
 	completed_matches = config.get_value("statistics", "completed_matches", [])
@@ -186,6 +189,7 @@ func save_profile() -> Error:
 	config.set_value("player", "headwear", headwear_index)
 	config.set_value("player", "accessory", accessory_index)
 	config.set_value("player", "tutorial_seen", tutorial_seen)
+	config.set_value("display", "screen_shake", screen_shake)
 	for key in statistics:
 		config.set_value("statistics", key, statistics[key])
 	config.set_value("statistics", "completed_matches", completed_matches)

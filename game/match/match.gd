@@ -6,6 +6,9 @@ const TAG_BURST = preload("res://game/match/tag_burst.gd")
 const SCOREBOARD = preload("res://game/match/scoreboard.gd")
 const SCORE_TOGGLE = preload("res://game/match/score_toggle.gd")
 const SCORE_POPUP = preload("res://game/match/score_popup.gd")
+const IMPACT_FX = preload("res://game/match/impact_fx.gd")
+const AMBIENCE = preload("res://game/match/ambience.gd")
+const BOUNCE_DUST = preload("res://scenes/sprint_dust.gd")
 const THROWOFF_TITLE_SFX = preload("res://assets/audio/sfx/throwoff_title.wav")
 const THROWOFF_TICK_SFX = preload("res://assets/audio/sfx/throwoff_tick.wav")
 const THROWOFF_GO_SFX = preload("res://assets/audio/sfx/throwoff_go.wav")
@@ -91,6 +94,11 @@ var shown_scores: Dictionary = {}
 var last_final_tick := FINAL_COUNTDOWN_SECONDS + 1
 var phase_label_color := Color("fff5dc")
 var shake_strength := 0.0
+var ambience: Node2D
+var seen_bounces: Dictionary = {}
+# The host simulates every body at 60 Hz; interpolation draws them smoothly at any
+# refresh rate. Joiners keep their own snapshot smoothing, so they leave this off.
+var smooth_motion := false
 
 func _ready() -> void:
 	Music.play_music("lobby")
@@ -113,6 +121,14 @@ func _ready() -> void:
 	level.get_node("World/World Border").position = Vector2.ZERO
 	CATALOG.configure(level, LanSession.selected_map)
 	add_child(level)
+	ambience = AMBIENCE.new()
+	ambience.setup(level, LanSession.selected_map, CAMERA_BOUNDS)
+	add_child(ambience)
+	smooth_motion = LanSession.is_host()
+	if smooth_motion:
+		# Only the bodies below opt in; effects and the camera move per frame and stay off.
+		physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
+		get_tree().physics_interpolation = true
 	var base := Node2D.new()
 	base.name = "CanBase"
 	base.position = CAN_START
@@ -126,6 +142,7 @@ func _ready() -> void:
 	can.base_path = NodePath("../CanBase")
 	can.collision_mask = 1 | 16
 	add_child(can)
+	_interpolate(can)
 	setup_network_world()
 	LanSession.match_event_received.connect(_match_event)
 	LanSession.skill_requested.connect(_skill_requested)
@@ -135,6 +152,24 @@ func _ready() -> void:
 	# Automatically acknowledge scene loading; no rules dialog gates the match.
 	LanSession.acknowledge_tutorial()
 	queue_redraw()
+
+func _exit_tree() -> void:
+	if smooth_motion:
+		get_tree().physics_interpolation = false
+
+func _interpolate(node: Node) -> void:
+	if smooth_motion and is_instance_valid(node):
+		node.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_ON
+		node.reset_physics_interpolation()
+
+# Teleports (phase changes, tag resets) must not be smeared across a frame.
+func _snap_bodies() -> void:
+	if not smooth_motion:
+		return
+	for actor in actors.values():
+		actor.reset_physics_interpolation()
+	if is_instance_valid(can):
+		can.reset_physics_interpolation()
 
 func _spawn_point(slot: int) -> Vector2:
 	return Vector2(940 + (slot % 2) * 130, 510 + slot * 50)
@@ -159,6 +194,7 @@ func _sync_actors() -> void:
 		replacement.set_taya_role(true)
 		if stage == "tag_reset": replacement.accept_local_input = false
 		can.reset_for_preview(can.base.position)
+		_snap_bodies()
 		tag_immunity = 1.0
 		if notice_label != null:
 			_announce_new_taya(taya_id, replacement.global_position)
@@ -174,6 +210,7 @@ func _actor_added(actor: CharacterBody2D) -> void:
 	actor.tag_requested.connect(_tag_requested.bind(actor))
 	scores[actor.get_meta("peer_id")] = 0
 	stats[actor.get_meta("peer_id")] = {"hits": 0, "tags": 0, "returns": 0}
+	_interpolate(actor)
 
 func _world_inputs_enabled() -> bool:
 	return stage in ["throw_off", "preparation", "active"]
@@ -299,6 +336,7 @@ func _start_intro() -> void:
 		actor.movement_locked = false
 		actor.throwoff_locked = false
 		actor.set_meta("intro_velocity", Vector2.ZERO)
+	_snap_bodies()
 
 func _start_run_to_line() -> void:
 	stage = "run_to_line"
@@ -322,6 +360,7 @@ func _start_throw_off() -> void:
 		actor.accept_local_input = true
 		actor.network_input = {}
 		actor.network_edges.clear()
+	_snap_bodies()
 	_notice("AIM AT THE CAN — ONE THROW EACH!")
 
 func _update_throw_off() -> void:
@@ -385,6 +424,7 @@ func _start_preparation() -> void:
 		actor.accept_local_input = id == taya_id
 		actor.movement_locked = false
 		actor.throwoff_locked = false
+	_snap_bodies()
 
 func _start_scoring() -> void:
 	if taya_id == 0:
@@ -398,6 +438,7 @@ func _slipper_spawned(actor: CharacterBody2D, slipper: Node2D) -> void:
 	if stage == "throw_off":
 		actor.throwoff_locked = true
 		slipper.throwoff_stop_at_can = true
+	_interpolate(slipper)
 	if stage == "active":
 		if slipper == actor.active_slipper:
 			actor.set_meta("returning", true)
@@ -542,6 +583,7 @@ func _place_tag_reset_players() -> void:
 		actor.position = TAG_RESET_TAYA_START if id == taya_id else _line_point(int(LanSession.member(id).get("slot", 0)))
 		actor.velocity = Vector2.ZERO
 		actor._keep_out_of_can_circle()
+	_snap_bodies()
 
 func _resume_after_tag() -> void:
 	if not tag_reset_repositioned: _place_tag_reset_players()
@@ -576,7 +618,37 @@ func _add_point(id: int, kind := "") -> void:
 	stats[id] = entry
 
 func _shake(strength: float) -> void:
-	shake_strength = maxf(shake_strength, strength)
+	if UserSettings.screen_shake:
+		shake_strength = maxf(shake_strength, strength)
+
+func _spawn_can_impact(strength: float) -> void:
+	var burst := IMPACT_FX.new()
+	burst.strength = strength
+	burst.position = can.global_position + Vector2(0, -27)
+	burst.z_index = 35
+	add_child(burst)
+
+# A small dust puff each time a thrown slipper smacks the floor.
+func _update_bounce_dust() -> void:
+	var live := {}
+	for actor in actors.values():
+		var slipper: Node2D = actor.active_slipper
+		if not is_instance_valid(slipper) or not slipper.visible:
+			continue
+		var key := slipper.get_instance_id()
+		live[key] = true
+		var bounces: int = slipper.floor_bounces
+		if bounces > int(seen_bounces.get(key, 0)):
+			var dust := BOUNCE_DUST.new()
+			dust.position = slipper.global_position
+			dust.scale = Vector2.ONE * 0.42
+			dust.lifetime = 0.4
+			dust.drift_direction = Vector2(signf(slipper.velocity.x), 0.0)
+			dust.z_index = 5
+			add_child(dust)
+		seen_bounces[key] = bounces
+	for key in seen_bounces.keys():
+		if not live.has(key): seen_bounces.erase(key)
 
 func _update_score_popups() -> void:
 	for id in scores:
@@ -859,6 +931,7 @@ func _update_match_sfx() -> void:
 			can_sfx.pitch_scale = lerpf(0.9, 1.08, strength)
 			can_sfx.play()
 			_shake(lerpf(CAN_SHAKE_MIN, CAN_SHAKE_MAX, strength))
+			_spawn_can_impact(strength)
 		last_can_state = can.state
 
 
@@ -876,6 +949,7 @@ func _process(delta: float) -> void:
 	_update_intro_visual()
 	_update_tag_announcement()
 	_update_score_popups()
+	_update_bounce_dust()
 	_update_camera(delta)
 
 func _update_tag_announcement() -> void:

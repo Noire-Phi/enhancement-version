@@ -212,7 +212,7 @@ func _build_room_code() -> void:
 	elif LanSession.mode == "online":
 		room_code_button.text = "ROOM CODE\n" + LanSession.room_code
 	elif LanSession.mode == "developer":
-		room_code_button.text = "DEVELOPER\n%d BOTS" % LanSession.developer_bot_count
+		room_code_button.text = _developer_room_text()
 	else:
 		room_code_button.text = "PRACTICE"
 	room_code_button.tooltip_text = "Copy online room code • Up to 4 players" if LanSession.mode == "online" else "Copy room code • UDP %d • Friends need the same game update" % LanSession.PORT if LanSession.mode == "lan" else "Developer games and practice do not change saved statistics."
@@ -325,7 +325,7 @@ func _refresh_bot_controls() -> void:
 	fewer_bots.disabled = LanSession.developer_bot_count <= (1 if LanSession.developer_role == "player" else 0)
 	more_bots.disabled = LanSession.developer_bot_count == LanSession.MAX_PLAYERS - 1
 	bot_controls.tooltip_text = "Player needs at least one bot to be Taya." if LanSession.developer_role == "player" else "No opponents; solo mechanics test." if LanSession.developer_bot_count == 0 else "Bots join when you press Start."
-	room_code_button.text = "DEVELOPER\n%d %s" % [LanSession.developer_bot_count, "BOT" if LanSession.developer_bot_count == 1 else "BOTS"]
+	room_code_button.text = _developer_room_text()
 
 
 func _extra_snapshot() -> Dictionary:
@@ -335,3 +335,10 @@ func _extra_snapshot() -> Dictionary:
 func _apply_extra_snapshot(data: Dictionary) -> void:
 	practice_hits = int(data.get("hits", 0))
 	$HUD/Screen/PracticeHits.text = "%d HITS" % practice_hits
+
+
+func _developer_room_text() -> String:
+	var count := LanSession.developer_bot_count
+	if LanSession.is_vs_ai():
+		return "VS AI · %s\n%d CPU" % [LanSession.ai_difficulty.to_upper(), count]
+	return "DEVELOPER\n%d %s" % [count, "BOT" if count == 1 else "BOTS"]

@@ -142,6 +142,17 @@ func _build_profile_controls() -> void:
 	practice.text = "Practice"
 	practice.pressed.connect(_open_practice)
 	add_child(practice)
+	var vs_ai_shadow := $ButtonShadow_PlayLocal.duplicate()
+	vs_ai_shadow.name = "ButtonShadow_VsAI"
+	vs_ai_shadow.position.y += 256
+	add_child(vs_ai_shadow)
+	var vs_ai: Button = $PlayLocal.duplicate()
+	vs_ai.name = "VsAI"
+	vs_ai.position.y += 256
+	vs_ai.text = "VS AI"
+	vs_ai.tooltip_text = "Play offline against computer opponents"
+	vs_ai.pressed.connect(_show_vs_ai_popup)
+	add_child(vs_ai)
 	var statistics_shadow := $ButtonShadow_Friends.duplicate()
 	statistics_shadow.name = "ButtonShadow_Statistics"
 	statistics_shadow.position.y += 128
@@ -157,7 +168,7 @@ func _build_profile_controls() -> void:
 func _color_menu_buttons() -> void:
 	var colors := {
 		"PlayOnline": Color("4d91e8"), "PlayLocal": Color("57b948"),
-		"Practice": Color("33b8b2"), "Avatar": Color("a575e0"),
+		"Practice": Color("33b8b2"), "VsAI": Color("f08a32"), "Avatar": Color("a575e0"),
 		"Friends": Color("e96eb4"), "Statistics": Color("f5d34c"),
 		"Messages": Color("f26c60"), "Settings": Color("e6c79b"),
 	}
@@ -186,6 +197,78 @@ func _open_practice() -> void:
 	_save_name()
 	LanSession.begin_local("practice")
 	get_tree().change_scene_to_file("res://ui/waiting_room/waiting_room.tscn")
+
+
+const AI_LEVELS := [
+	["easy", "EASY", "Slow, wobbly throws. Taya walks.", Color("3f9a4a")],
+	["normal", "NORMAL", "Decent aim and quick reactions.", Color("d48a1c")],
+	["hard", "HARD", "Near-perfect throws. Taya hunts you.", Color("c5271d")],
+]
+var ai_choice := "normal"
+var ai_bots := 4
+
+func _show_vs_ai_popup() -> void:
+	_save_name()
+	var view = UI.modal(self, "VS AI", "Offline match against computer opponents. Pick how tough they are.")
+	view.layer.name = "VsAIPopup"
+	var levels := HBoxContainer.new()
+	levels.alignment = BoxContainer.ALIGNMENT_CENTER
+	levels.add_theme_constant_override("separation", 18)
+	view.content.add_child(levels)
+	var detail := UI.label("", 22)
+	detail.add_theme_color_override("font_color", Color("ffe29a"))
+	var buttons: Array[Button] = []
+	var refresh := func() -> void:
+		for index in range(AI_LEVELS.size()):
+			var level: Array = AI_LEVELS[index]
+			var chosen: bool = level[0] == ai_choice
+			var button: Button = buttons[index]
+			button.text = ("▶ " if chosen else "") + level[1]
+			var style := UI.panel(level[3] if chosen else Color("624228"), 6 if chosen else 4)
+			if chosen: style.border_color = Color("fff0a8")
+			for state in ["normal", "hover", "pressed", "focus"]:
+				button.add_theme_stylebox_override(state, style)
+			if chosen: detail.text = level[2]
+	for level in AI_LEVELS:
+		var button := UI.button(level[1], func() -> void: pass)
+		button.name = "AI" + str(level[1]).capitalize()
+		button.custom_minimum_size = Vector2(260, 72)
+		button.pressed.connect(func() -> void:
+			ai_choice = level[0]
+			refresh.call()
+		)
+		levels.add_child(button)
+		buttons.append(button)
+	view.content.add_child(detail)
+	var count_row := HBoxContainer.new()
+	count_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	count_row.add_theme_constant_override("separation", 18)
+	view.content.add_child(count_row)
+	var count := UI.label("", 28)
+	count.custom_minimum_size.x = 300
+	var set_count := func(value: int) -> void:
+		ai_bots = clampi(value, 1, LanSession.MAX_PLAYERS - 1)
+		count.text = "%d OPPONENT%s" % [ai_bots, "" if ai_bots == 1 else "S"]
+	var fewer := UI.button("−", func() -> void: set_count.call(ai_bots - 1))
+	var more := UI.button("+", func() -> void: set_count.call(ai_bots + 1))
+	for button in [fewer, more]: button.custom_minimum_size = Vector2(72, 64)
+	count_row.add_child(fewer)
+	count_row.add_child(count)
+	count_row.add_child(more)
+	set_count.call(ai_bots)
+	refresh.call()
+	var actions := HBoxContainer.new()
+	actions.alignment = BoxContainer.ALIGNMENT_CENTER
+	actions.add_theme_constant_override("separation", 20)
+	view.content.add_child(actions)
+	var start := UI.button("Start", func() -> void:
+		LanSession.begin_vs_ai(ai_choice, ai_bots)
+		get_tree().change_scene_to_file("res://ui/waiting_room/waiting_room.tscn")
+	)
+	start.name = "StartVsAI"
+	actions.add_child(start)
+	actions.add_child(UI.button("Back", view.layer.queue_free))
+	buttons[AI_LEVELS.map(func(level: Array) -> String: return level[0]).find(ai_choice)].grab_focus()
 
 
 func _show_statistics() -> void:

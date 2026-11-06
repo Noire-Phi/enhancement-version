@@ -285,7 +285,7 @@ func _update_bot(actor: CharacterBody2D) -> void:
 				if distance < nearest:
 					nearest = distance
 					destination = candidate.global_position
-			lunge = actor.can_lunge() and nearest < 290.0
+			lunge = actor.can_lunge() and nearest < float(LanSession.bot_profile().lunge)
 	elif is_instance_valid(actor.active_slipper):
 		if actor.active_slipper.lost_remaining > 0.0:
 			destination = actor.global_position
@@ -303,7 +303,20 @@ func _update_bot(actor: CharacterBody2D) -> void:
 			destination = actor.global_position
 			throwing = actor.attack_state != actor.AttackState.CHARGING or actor.charge_bar.value < float(actor.get_meta("bot_release_at", actor.sweet_spot))
 	var toward := destination - actor.global_position
-	actor.apply_network_input({"move": toward.normalized() if toward.length() > 18.0 else Vector2.ZERO, "aim": can.get_hit_center() if not actor.is_taya else destination, "throw": throwing, "sprint": true, "interact": interact, "lunge": lunge})
+	var move: Vector2 = toward.normalized() if toward.length() > 18.0 else Vector2.ZERO
+	# Easier bots react late: they keep their last heading until their next decision.
+	var profile: Dictionary = LanSession.bot_profile()
+	var now := LanSession.clock_time()
+	# Arriving (no move) applies at once so bots never drift out of the throwing spot.
+	if float(profile.think) > 0.0 and move != Vector2.ZERO:
+		if now < float(actor.get_meta("bot_next_think", 0.0)):
+			move = actor.get_meta("bot_move", move)
+		else:
+			actor.set_meta("bot_next_think", now + float(profile.think) * randf_range(0.7, 1.3))
+			actor.set_meta("bot_move", move)
+	var aim: Vector2 = can.get_hit_center() + actor.get_meta("bot_aim_offset", Vector2.ZERO) if not actor.is_taya else destination
+	var sprint: bool = bool(profile.taya_sprint) or not actor.is_taya
+	actor.apply_network_input({"move": move, "aim": aim, "throw": throwing, "sprint": sprint, "interact": interact, "lunge": lunge})
 
 func _snapshot() -> Dictionary:
 	var state := {"actors": [], "cans": [], "extra": _extra_snapshot()}

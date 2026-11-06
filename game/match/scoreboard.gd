@@ -55,5 +55,5 @@ func _draw() -> void:
 		draw_string(FONT, Vector2(width - 47, top + 29), str(row.score), HORIZONTAL_ALIGNMENT_RIGHT, 39, 23, CREAM)
 	draw_line(Vector2(width - 51, 99), Vector2(width - 51, 330), Color(GOLD, 0.58), 2.0, true)
 	draw_line(Vector2(0, 342), Vector2(width, 342), GOLD, 2.0, true)
-	draw_string(FONT, Vector2(0, 366), "DEVELOPER" if developer else "LIVE MATCH", HORIZONTAL_ALIGNMENT_LEFT, width - 100, 16, GOLD)
+	draw_string(FONT, Vector2(0, 366), ("VS AI · " + LanSession.ai_difficulty.to_upper() if LanSession.is_vs_ai() else "DEVELOPER") if developer else "LIVE MATCH", HORIZONTAL_ALIGNMENT_LEFT, width - 100, 16, GOLD)
 	draw_string(FONT, Vector2(width - 124, 366), "STATS OFF" if developer else "%d PLAYERS" % rows.size(), HORIZONTAL_ALIGNMENT_RIGHT, 124, 16, CREAM)

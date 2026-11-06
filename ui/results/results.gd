@@ -89,7 +89,7 @@ func _ready() -> void:
 		_text("%d. %s   %d point%s" % [rank + 1, member.name, member.score, "" if int(member.score) == 1 else "s"],Vector2(200 + (rank - 3) * 760, 825), Vector2(760, 55), 26)
 	_build_awards(rankings)
 	if LanSession.mode == "developer":
-		_text("Developer games do not affect saved statistics.", Vector2(300, 895), Vector2(1320, 40), 22)
+		_text("Games against AI do not affect saved statistics." if LanSession.is_vs_ai() else "Developer games do not affect saved statistics.", Vector2(300, 895), Vector2(1320, 40), 22)
 	var leave := UI.button("Main Menu", func() -> void:
 		LanSession.close_room()
 		get_tree().change_scene_to_file("res://ui/main_menu/main_menuu.tscn")

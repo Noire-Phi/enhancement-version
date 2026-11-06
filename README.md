@@ -1,5 +1,10 @@
 # Can Clash
 
+> **Enhancement version.** This fork adds VS AI mode, smoother motion, new hit
+> and arena effects, score popups and match awards. See the latest entries in
+> [docs/decisions.md](docs/decisions.md). The original game lives at
+> [RalphAI-suiii/Can-Clash](https://github.com/RalphAI-suiii/Can-Clash).
+
 A Godot 4.7.2 arena game inspired by Tumbang Preso, with a playable menu,
 waiting room, bots, host-authoritative matches and podium results.
 
@@ -12,6 +17,8 @@ Import `project.godot` in Godot and run the main scene.
   the developer's game keys using [the setup guide](docs/online_setup.md).
 - **Practice:** choose a character, then play a guided thrower and Taya tutorial.
   Restart any time or choose Free practice; no keys or network required.
+- **VS AI:** an offline match against 1–4 computer opponents on Easy, Normal
+  or Hard. No network needed; results do not change saved statistics.
 - Enter `developer-mode` in Play Local's Join field for a solo bot match.
   Set 0–4 bots in that waiting room before pressing Ready and Start.
 

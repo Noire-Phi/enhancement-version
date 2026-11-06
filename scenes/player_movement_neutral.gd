@@ -771,7 +771,10 @@ func _start_charge() -> void:
 	charge_started = LanSession.clock_time()
 	sweet_spot = randf_range(0.25, 0.75)
 	charge_bar.target_center = sweet_spot
-	set_meta("bot_release_at", sweet_spot + randf_range(-0.025, 0.025))
+	# Bots release near the sweet spot; VS AI difficulty widens the spread and adds aim error.
+	var profile: Dictionary = LanSession.bot_profile()
+	set_meta("bot_release_at", clampf(sweet_spot + randf_range(-profile.release, profile.release), 0.05, 0.98))
+	set_meta("bot_aim_offset", Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * float(profile.aim))
 	charge_bar.value = 0.0
 	charge_bar.visible = is_local_view()
 	interact_prompt.hide()

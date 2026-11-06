@@ -60,6 +60,31 @@ var developer_role := "random"
 var developer_bot_count := 4:
 	set(value):
 		developer_bot_count = clampi(value, 0, MAX_PLAYERS - 1)
+# Offline VS AI mode reuses the local developer room with tuned bots.
+# Empty means bots play at full strength (developer testing).
+const AI_DIFFICULTIES := ["easy", "normal", "hard"]
+const AI_PROFILES := {
+	# release: charge-meter spread around the sweet spot; aim: pixel error at the can;
+	# think: seconds between movement decisions; lunge: Taya dash trigger range.
+	"easy": {"release": 0.30, "aim": 70.0, "think": 0.45, "lunge": 170.0, "taya_sprint": false},
+	"normal": {"release": 0.12, "aim": 30.0, "think": 0.2, "lunge": 230.0, "taya_sprint": true},
+	"hard": {"release": 0.03, "aim": 6.0, "think": 0.0, "lunge": 290.0, "taya_sprint": true},
+}
+var ai_difficulty := ""
+
+func is_vs_ai() -> bool:
+	return mode == "developer" and ai_difficulty in AI_DIFFICULTIES
+
+func bot_profile() -> Dictionary:
+	return AI_PROFILES[ai_difficulty] if is_vs_ai() else {"release": 0.025, "aim": 0.0, "think": 0.0, "lunge": 290.0, "taya_sprint": true}
+
+func begin_vs_ai(difficulty: String, bots: int) -> void:
+	begin_local("developer")
+	ai_difficulty = difficulty if difficulty in AI_DIFFICULTIES else "normal"
+	room_code = "VS AI"
+	developer_role = "random"
+	developer_map = -1
+	developer_bot_count = maxi(1, bots)
 
 func _ready() -> void:
 	online = preload("res://autoload/gdsync_transport.gd").new()
@@ -107,6 +132,7 @@ func close_room() -> void:
 	mode = "menu"
 	phase = "menu"
 	room_code = ""
+	ai_difficulty = ""
 	host_address = ""
 	join_target = ""
 	join_deadline = 0.0
@@ -376,7 +402,7 @@ func add_developer_bots() -> void:
 		available.erase(entry.character)
 	for slot in range(1, developer_bot_count + 1):
 		if member(-slot).is_empty():
-			players.append({"id": -slot, "name": "Bot %d" % slot, "ready": true, "slot": slot, "character": available.pop_front(), "color": COLORS[slot], "bot": true})
+			players.append({"id": -slot, "name": ("CPU %d" if is_vs_ai() else "Bot %d") % slot, "ready": true, "slot": slot, "character": available.pop_front(), "color": COLORS[slot], "bot": true})
 
 @rpc("authority", "call_remote", "reliable")
 func _begin_selection(map_index: int, seed_value: int, id: String) -> void:

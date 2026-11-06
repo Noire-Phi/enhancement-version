@@ -28,7 +28,25 @@ func _popups(game: Node) -> Array:
 
 func _run() -> void:
 	var session: Node = root.get_node("LanSession")
-	root.get_node("UserSettings").tutorial_seen = true
+	var settings: Node = root.get_node("UserSettings")
+	settings.tutorial_seen = true
+	settings.screen_shake = true
+
+	# VS AI: difficulty profiles, CPU names and labels; developer bots keep full strength.
+	session.begin_local("developer")
+	_check(not session.is_vs_ai() and session.bot_profile().release == 0.025, "developer bots keep their original accuracy")
+	session.begin_vs_ai("easy", 2)
+	_check(session.is_vs_ai() and session.developer_bot_count == 2 and session.room_code == "VS AI", "vs AI room starts")
+	session.add_developer_bots()
+	_check(session.players.size() == 3 and str(session.players[1].name).begins_with("CPU"), "vs AI opponents are CPUs")
+	_check(session.bot_profile().release > session.AI_PROFILES.hard.release and not session.bot_profile().taya_sprint, "easy bots are weaker")
+	session.close_room()
+	_check(not session.is_vs_ai(), "closing the room clears vs AI")
+	session.begin_vs_ai("impossible", 0)
+	_check(session.ai_difficulty == "normal" and session.developer_bot_count == 1, "bad input falls back safely")
+	session.close_room()
+
+	session.developer_bot_count = 4
 	session.begin_local("developer")
 	session.add_developer_bots()
 	var game: Node2D = load("res://game/match/match.tscn").instantiate()
@@ -40,6 +58,22 @@ func _run() -> void:
 		actor.accept_local_input = false
 	var ids: Array = game.actors.keys()
 	_check(ids.size() >= 3, "developer match should have bots")
+
+	# Ambience and smooth motion.
+	_check(game.ambience != null and game.ambience.get_node_or_null("CloudShadows") != null, "cloud shadows exist")
+	_check(game.ambience.particles != null and game.ambience.particles.amount > 0, "map particles exist")
+	_check(game.ambience.vignette != null, "vignette exists")
+	_check(physics_interpolation and game.smooth_motion, "host turns on smooth motion")
+	_check(game.actors[ids[0]].physics_interpolation_mode == Node.PHYSICS_INTERPOLATION_MODE_ON, "players are interpolated")
+	_check(game.match_camera.physics_interpolation_mode != Node.PHYSICS_INTERPOLATION_MODE_ON and not game.match_camera.is_physics_interpolated(), "camera is not interpolated")
+
+	# Can impact burst and the screen-shake toggle.
+	game._spawn_can_impact(0.8)
+	_check(game.get_children().any(func(node: Node) -> bool: return node.get_script() == game.IMPACT_FX), "can impact burst spawns")
+	settings.screen_shake = false
+	game._shake(12.0)
+	_check(game.shake_strength == 0.0, "screen shake setting turns shake off")
+	settings.screen_shake = true
 	game.stage = "active"
 	game.remaining = 120.0
 	game.phase_deadline = session.clock_time() + game.remaining
@@ -116,6 +150,7 @@ func _run() -> void:
 	var screen: Node = current_scene
 	var awards: Node = screen.get_node_or_null("Awards") if screen != null else null
 	_check(awards != null and awards.get_child_count() == 3, "results show three award cards")
+	_check(not physics_interpolation, "smooth motion turns off after the match")
 
 	if failures == 0:
 		print("PASS: enhancements smoke")

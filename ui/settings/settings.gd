@@ -57,6 +57,17 @@ func _build() -> void:
 	bottom.alignment = BoxContainer.ALIGNMENT_CENTER
 	bottom.add_theme_constant_override("separation", 20)
 	content.add_child(bottom)
+	# Reduced-motion option for players sensitive to camera shake.
+	var shake := UI.button("", func() -> void: pass)
+	shake.name = "ScreenShake"
+	var label_shake := func() -> void: shake.text = "SCREEN SHAKE: " + ("ON" if UserSettings.screen_shake else "OFF")
+	shake.pressed.connect(func() -> void:
+		UserSettings.screen_shake = not UserSettings.screen_shake
+		UserSettings.save_profile()
+		label_shake.call()
+	)
+	label_shake.call()
+	bottom.add_child(shake)
 	bottom.add_child(UI.button("RESET DEFAULTS", _reset))
 	bottom.add_child(UI.button("BACK", _close))
 
