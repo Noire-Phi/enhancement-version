@@ -100,6 +100,8 @@ var seen_bounces: Dictionary = {}
 # The host simulates every body at 60 Hz; interpolation draws them smoothly at any
 # refresh rate. Joiners keep their own snapshot smoothing, so they leave this off.
 var smooth_motion := false
+var pause_menu: Control
+var hit_stop_until := 0
 
 func _ready() -> void:
 	Music.play_music("lobby")
@@ -156,6 +158,7 @@ func _ready() -> void:
 	queue_redraw()
 
 func _exit_tree() -> void:
+	Engine.time_scale = 1.0
 	if smooth_motion:
 		get_tree().physics_interpolation = false
 
@@ -611,6 +614,7 @@ func _spawn_tag_burst(position: Vector2) -> void:
 	burst.z_index = 30
 	add_child(burst)
 	_shake(TAG_SHAKE)
+	_hit_stop(90)
 
 func _add_point(id: int, kind := "") -> void:
 	scores[id] = int(scores.get(id, 0)) + 1
@@ -623,6 +627,19 @@ func _add_point(id: int, kind := "") -> void:
 func _shake(strength: float) -> void:
 	if UserSettings.screen_shake:
 		shake_strength = maxf(shake_strength, strength)
+
+# A brief near-freeze sells big impacts. Offline only: networked matches keep
+# every peer on the host's clock, so time is never bent there.
+func _hit_stop(milliseconds: int) -> void:
+	if LanSession.is_networked() or not UserSettings.screen_shake:
+		return
+	Engine.time_scale = 0.05
+	hit_stop_until = Time.get_ticks_msec() + milliseconds
+
+func _update_hit_stop() -> void:
+	if hit_stop_until > 0 and Time.get_ticks_msec() >= hit_stop_until:
+		hit_stop_until = 0
+		Engine.time_scale = 1.0
 
 func _spawn_can_impact(strength: float) -> void:
 	var burst := IMPACT_FX.new()
@@ -740,6 +757,15 @@ func _build_hud() -> void:
 	phase_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	phase_label.position = Vector2(-650, 35)
 	phase_label.size = Vector2(1300, 60)
+	# The timer sits on a dark pill so it reads over any arena art.
+	var pill := UI.panel(Color(0.12, 0.07, 0.04, 0.78), 3)
+	pill.set_corner_radius_all(30)
+	pill.content_margin_left = 30
+	pill.content_margin_right = 30
+	pill.content_margin_top = 6
+	pill.content_margin_bottom = 8
+	pill.shadow_size = 8
+	phase_label.add_theme_stylebox_override("normal", pill)
 	screen.add_child(phase_label)
 	phase_label_color = screen.theme.get_color("font_color", "Label")
 	role_status_label = UI.label("", 32)
@@ -792,6 +818,13 @@ func _build_hud() -> void:
 	var leave := UI.button("Leave", _leave_match)
 	leave.position = Vector2(25, 28)
 	screen.add_child(leave)
+	var pause_layer := CanvasLayer.new()
+	pause_layer.layer = 15
+	pause_layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(pause_layer)
+	pause_menu = preload("res://ui/pause_menu/pause_menu.tscn").instantiate()
+	pause_menu.leave_requested.connect(_leave_match)
+	pause_layer.add_child(pause_menu)
 	tag_shade = ColorRect.new()
 	tag_shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	tag_shade.color = Color(0.18, 0.015, 0.01, 0.0)
@@ -823,6 +856,9 @@ func _update_hud() -> void:
 	var time_text := "%d:%02d" % [int(ceil(remaining)) / 60, int(ceil(remaining)) % 60]
 	phase_label.text = "WAITING FOR PLAYERS TO LOAD" if stage == "loading" else "THROW OFF INCOMING" if stage in ["intro", "run_to_line"] else "WAITING FOR SLIPPERS" if stage == "throw_off" and remaining <= 0.0 else "THROW OFF  " + time_text if stage == "throw_off" else "INITIAL TAYA" if stage == "throw_off_result" else "TAYA PREPARATION  " + time_text if stage == "preparation" else "RETURN TO THE LINE" if stage == "tag_reset" else "MATCH  " + time_text
 	phase_label.visible = stage != "intro" and stage != "throw_off_result"
+	# Shrink the pill to the text and keep it centred.
+	phase_label.reset_size()
+	phase_label.position = Vector2((phase_label.get_parent().size.x - phase_label.size.x) * 0.5, 28)
 	var final_seconds := stage == "active" and remaining > 0.0 and remaining <= FINAL_COUNTDOWN_SECONDS
 	var pulse := 0.5 + 0.5 * sin(LanSession.clock_time() * TAU * 2.0) if final_seconds else 0.0
 	phase_label.add_theme_color_override("font_color", phase_label_color.lerp(FINAL_COUNTDOWN_COLOR, 0.55 + 0.45 * pulse) if final_seconds else phase_label_color)
@@ -935,6 +971,7 @@ func _update_match_sfx() -> void:
 			can_sfx.play()
 			_shake(lerpf(CAN_SHAKE_MIN, CAN_SHAKE_MAX, strength))
 			_spawn_can_impact(strength)
+			_hit_stop(70)
 		last_can_state = can.state
 
 
@@ -951,6 +988,7 @@ func _process(delta: float) -> void:
 	_update_match_sfx()
 	_update_intro_visual()
 	_update_tag_announcement()
+	_update_hit_stop()
 	_update_score_popups()
 	_update_bounce_dust()
 	_update_camera(delta)

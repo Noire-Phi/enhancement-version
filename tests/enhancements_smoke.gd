@@ -97,6 +97,26 @@ func _run() -> void:
 	game._shake(12.0)
 	_check(game.shake_strength == 0.0, "screen shake setting turns shake off")
 	settings.screen_shake = true
+
+	# Hit-stop (offline only) always returns to normal speed.
+	game._hit_stop(40)
+	_check(Engine.time_scale < 0.5, "hit-stop slows time offline")
+	await create_timer(0.08, true, false, true).timeout
+	await process_frame
+	_check(is_equal_approx(Engine.time_scale, 1.0), "hit-stop restores normal speed")
+
+	# Pause menu: offline it freezes the match and resumes cleanly.
+	game.pause_menu.open()
+	_check(paused and game.pause_menu.visible, "pause menu pauses an offline match")
+	game.pause_menu.close()
+	_check(not paused, "resume unpauses")
+
+	# Game-wide polish: buttons get hover/press animation, scenes fade in.
+	_check(root.has_node("VisualPolish"), "visual polish autoload runs")
+	var probe := Button.new()
+	root.add_child(probe)
+	_check(probe.has_meta("polished"), "buttons are animated game-wide")
+	probe.queue_free()
 	game.stage = "active"
 	game.remaining = 120.0
 	game.phase_deadline = session.clock_time() + game.remaining

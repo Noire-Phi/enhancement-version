@@ -97,7 +97,64 @@ func _ready() -> void:
 	leave.position = Vector2(760, 965)
 	leave.size = Vector2(400, 75)
 	add_child(leave)
+	_celebrate(stage, rankings)
 
+
+# Podium blocks rise third → second → first, then players and names drop on,
+# award cards slide in and confetti in the winner's colour falls for a moment.
+func _celebrate(stage: Control, rankings: Array) -> void:
+	var order := {"Place3": 0, "Place2": 1, "Place1": 2}
+	for child in stage.get_children():
+		var item := child as CanvasItem
+		var resting: Vector2 = child.position
+		item.modulate.a = 0.0
+		var tween := create_tween().set_parallel()
+		if order.has(child.name):
+			var delay: float = 0.15 + order[child.name] * 0.18
+			child.position.y += 340.0
+			tween.tween_property(child, "position", resting, 0.55).set_delay(delay).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			tween.tween_property(item, "modulate:a", 1.0, 0.2).set_delay(delay)
+		else:
+			child.position.y -= 90.0
+			tween.tween_property(child, "position", resting, 0.4).set_delay(0.85).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+			tween.tween_property(item, "modulate:a", 1.0, 0.2).set_delay(0.85)
+	var awards := get_node_or_null("Awards") as Control
+	if awards != null:
+		var resting_x := awards.position.x
+		awards.position.x += 460.0
+		var slide := create_tween()
+		slide.tween_property(awards, "position:x", resting_x, 0.5).set_delay(1.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	var winner_color: Color = rankings[0].color if not rankings.is_empty() else Color("ffe29a")
+	var confetti := CPUParticles2D.new()
+	confetti.name = "Confetti"
+	var image := Image.create(6, 12, false, Image.FORMAT_RGBA8)
+	image.fill(Color.WHITE)
+	confetti.texture = ImageTexture.create_from_image(image)
+	confetti.position = Vector2(960, -30)
+	confetti.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	confetti.emission_rect_extents = Vector2(960, 10)
+	confetti.amount = 140
+	confetti.lifetime = 4.5
+	confetti.direction = Vector2.DOWN
+	confetti.spread = 25.0
+	confetti.initial_velocity_min = 120.0
+	confetti.initial_velocity_max = 260.0
+	confetti.gravity = Vector2(0, 160)
+	confetti.angular_velocity_min = -360.0
+	confetti.angular_velocity_max = 360.0
+	confetti.angle_max = 360.0
+	confetti.scale_amount_min = 0.8
+	confetti.scale_amount_max = 1.6
+	var palette := Gradient.new()
+	palette.set_color(0, winner_color)
+	palette.set_color(1, Color("ffd34d"))
+	palette.add_point(0.33, Color("ff5f5f"))
+	palette.add_point(0.66, Color("6fd3ff"))
+	confetti.color_initial_ramp = palette
+	add_child(confetti)
+	get_tree().create_timer(2.6).timeout.connect(func() -> void:
+		if is_instance_valid(confetti): confetti.emitting = false
+	)
 # Match awards: the player(s) with the most can hits, tags and safe returns.
 const AWARDS := [
 	{"key": "hits", "title": "SHARPSHOOTER", "unit": "can hit", "color": Color("2f7fcf")},

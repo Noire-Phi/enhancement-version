@@ -31,10 +31,37 @@ func _ready() -> void:
 	$Avatar.pressed.connect(_show_customization)
 	$Settings.pressed.connect(_show_settings)
 	play_local.grab_focus()
+	_play_entrance()
 	if LanSession.has_meta("notice"):
 		var notice = UI.modal(self, "ROOM CLOSED", str(LanSession.get_meta("notice")))
 		notice.content.add_child(UI.button("Back to menu", notice.layer.queue_free))
 		LanSession.remove_meta("notice")
+
+
+# Logo pops in, then menu buttons (with their shadow plates) slide in from the
+# screen edges in a short stagger. Arrive with a slight overshoot, never block input.
+func _play_entrance() -> void:
+	var logo: Control = $TextureRect
+	logo.pivot_offset = logo.size * 0.5
+	logo.scale = Vector2.ONE * 0.6
+	logo.modulate.a = 0.0
+	var pop := create_tween().set_parallel()
+	pop.tween_property(logo, "scale", Vector2.ONE, 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	pop.tween_property(logo, "modulate:a", 1.0, 0.25)
+	var columns := [[["PlayOnline", "PlayLocal", "Practice", "VsAI"], -1.0], [["Avatar", "Friends", "Statistics"], 1.0]]
+	for column in columns:
+		var index := 0
+		for button_name in column[0]:
+			for node_name in [button_name, "ButtonShadow_" + button_name]:
+				var item := get_node_or_null(NodePath(node_name)) as Control
+				if item == null: continue
+				var resting := item.position
+				item.position.x += 520.0 * column[1]
+				item.modulate.a = 0.0
+				var slide := create_tween().set_parallel()
+				slide.tween_property(item, "position", resting, 0.45).set_delay(0.12 + index * 0.07).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+				slide.tween_property(item, "modulate:a", 1.0, 0.2).set_delay(0.12 + index * 0.07)
+			index += 1
 
 
 func _show_local_popup() -> void:
