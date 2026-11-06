@@ -19,3 +19,7 @@ addons/GD-Sync/keys.cfg
 .idea/
 .DS_Store
 Thumbs.db
+
+# Local sprite tooling (RIFE binary link, Python cache)
+tools/sprites/rife
+tools/sprites/__pycache__/

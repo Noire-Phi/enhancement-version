@@ -33,9 +33,12 @@ func _run() -> void:
 						if character in ["Head Band", "Glasses Thrower", "Curly Haired"] and state != "taya":
 							for frame in range(player.sprite.sprite_frames.get_frame_count(name)):
 								var texture: AtlasTexture = player.sprite.sprite_frames.get_frame_texture(name, frame)
-								assert("/relaxed/" in texture.atlas.resource_path or "/motion_polish/" in texture.atlas.resource_path, "Throwers must not use aiming or throw-recovery movement")
+								# "/inbetween/" frames are generated only from these relaxed/polished walk poses.
+								assert("/relaxed/" in texture.atlas.resource_path or "/motion_polish/" in texture.atlas.resource_path or "/inbetween/" in texture.atlas.resource_path, "Throwers must not use aiming or throw-recovery movement")
 								if action == "idle" or (action in ["walk", "sprint"] and sector in [0, 4]):
-									assert("/motion_polish/" in texture.atlas.resource_path, "Neutral idle and side gait must use the corrected poses")
+									# Side gait: drawn corrected poses, plus in-betweens generated from them.
+									var generated: bool = action != "idle" and "/inbetween/" in texture.atlas.resource_path
+									assert("/motion_polish/" in texture.atlas.resource_path or generated, "Neutral idle and side gait must use the corrected poses")
 				if state == "empty":
 					slipper.free()
 					player.active_slipper = null

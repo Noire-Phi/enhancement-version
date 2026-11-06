@@ -277,6 +277,9 @@ func _prepare_movement_banks() -> void:
 				frames.set_animation_speed(name, frames.get_animation_speed(original))
 				for frame in range(frames.get_frame_count(original)):
 					frames.add_frame(name, frames.get_frame_texture(original, frame), frames.get_frame_duration(original, frame))
+	# Double every walk/sprint cycle with generated in-betweens where available.
+	if not has_meta("skip_inbetweens"):
+		preload("res://scenes/locomotion_inbetweens.gd").install(frames)
 
 
 func _movement_animation(action: String, direction_name: String) -> StringName:

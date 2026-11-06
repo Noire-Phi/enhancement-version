@@ -31,24 +31,34 @@ def rife(a: Path, b: Path, out: Path, model: str) -> None:
                    check=True, capture_output=True)
 
 
-# Flat key colour behind the sprite; none of the characters use pure green.
+# Flat key colour behind the sprite. Pure green suits most characters, but a
+# character who wears green (Bullcap) needs another; see choose_key.
 KEY = np.array([0.0, 1.0, 0.0], dtype=np.float32)
+KEY_CANDIDATES = [np.array(c, dtype=np.float32) for c in ([0, 1, 0], [1, 0, 1], [0, 1, 1], [0, 0, 1])]
 
 
-def midpoint(a: Image.Image, b: Image.Image, work: Path, model: str) -> Image.Image:
-    # One RIFE pass over sprite-on-green keeps colour and shape moving together;
+def choose_key(frames: list[Image.Image]) -> np.ndarray:
+    """The candidate key colour furthest from every colour the character wears."""
+    pixels = np.concatenate([np.asarray(f.convert("RGBA"))[np.asarray(f.convert("RGBA"))[..., 3] > 128][:, :3]
+                             for f in frames]).astype(np.float32) / 255.0
+    pixels = pixels[:: max(1, len(pixels) // 20000)]
+    return max(KEY_CANDIDATES, key=lambda key: float(np.linalg.norm(pixels - key, axis=1).min()))
+
+
+def midpoint(a: Image.Image, b: Image.Image, work: Path, model: str, key: np.ndarray = KEY) -> Image.Image:
+    # One RIFE pass over sprite-on-key keeps colour and shape moving together;
     # interpolating colour and alpha separately let them drift apart (black blobs).
     for name, img in (("a", a), ("b", b)):
         arr = np.asarray(img.convert("RGBA")).astype(np.float32) / 255.0
         alpha = arr[..., 3:4]
-        flat = arr[..., :3] * alpha + KEY * (1.0 - alpha)
+        flat = arr[..., :3] * alpha + key * (1.0 - alpha)
         Image.fromarray((flat * 255).round().astype(np.uint8)).save(work / f"{name}.png")
     rife(work / "a.png", work / "b.png", work / "m.png", model)
     rgb = np.asarray(Image.open(work / "m.png").convert("RGB")).astype(np.float32) / 255.0
-    # Pull the sprite back off the key: how far each pixel is from pure green.
-    distance = np.linalg.norm(rgb - KEY, axis=2, keepdims=True) / np.sqrt(2.0)
+    # Pull the sprite back off the key: how far each pixel is from the key colour.
+    distance = np.linalg.norm(rgb - key, axis=2, keepdims=True) / np.sqrt(2.0)
     alpha = np.clip((distance - 0.12) / 0.5, 0.0, 1.0)
-    colour = np.where(alpha > 0, (rgb - KEY * (1.0 - alpha)) / np.maximum(alpha, 1e-3), 0.0).clip(0, 1)
+    colour = np.where(alpha > 0, (rgb - key * (1.0 - alpha)) / np.maximum(alpha, 1e-3), 0.0).clip(0, 1)
     out = np.concatenate([colour, alpha], axis=2)
     return Image.fromarray((out * 255).round().astype(np.uint8), "RGBA")
 

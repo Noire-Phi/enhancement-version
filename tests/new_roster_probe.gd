@@ -1,7 +1,7 @@
 extends SceneTree
 
 const DIRECTIONS := ["right", "down_right", "down", "down_left", "left", "up_left", "up", "up_right"]
-const ACTIONS := {"idle": 4, "walk": 8, "sprint": 8, "aim": 1, "throw": 4, "hit": 1, "stunned": 2, "recover": 1}
+const ACTIONS := {"idle": 4, "walk": 16, "sprint": 16, "aim": 1, "throw": 4, "hit": 1, "stunned": 2, "recover": 1}
 
 
 func _initialize() -> void:
@@ -27,7 +27,7 @@ func _run() -> void:
 				for action in ACTIONS:
 					var animation := StringName(action + "_" + direction)
 					var frames := attack.sprite_frames if action in ["aim", "throw"] else body.sprite_frames
-					# Diagonal and side walks gained generated in-betweens (8 frames); those sprints stay 4.
+					# Walks and cardinal sprints are doubled twice (16 frames); diagonal/side sprints stay at 4 drawn frames.
 					var expected_count: int = 4 if (direction.contains("_") or direction in ["left", "right"]) and action == "sprint" else ACTIONS[action]
 					if not frames.has_animation(animation) or frames.get_frame_count(animation) != expected_count:
 						problems.append("%s: %s" % [path, animation])

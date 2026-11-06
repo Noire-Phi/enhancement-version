@@ -170,10 +170,16 @@ func _fit_frame(target: AnimatedSprite2D, frame_index: int) -> void:
 	target.position = Vector2(0.0, -(float(bounds.end.y) - texture.get_size().y * 0.5) * fitted_scale)
 
 
+## Visible pixels in the texture's own drawn space. An AtlasTexture's image is
+## its region only, drawn offset by its margin, so the margin is added back
+## (otherwise padded or tightly packed frames anchor their feet in the wrong place).
 static func _visible_bounds(texture: Texture2D, cache: Dictionary) -> Rect2i:
 	var id := texture.get_instance_id()
 	if not cache.has(id):
-		cache[id] = texture.get_image().get_used_rect()
+		var used := texture.get_image().get_used_rect()
+		if texture is AtlasTexture:
+			used.position += Vector2i((texture as AtlasTexture).margin.position)
+		cache[id] = used
 	return cache[id]
 
 

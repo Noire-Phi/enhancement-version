@@ -26,18 +26,18 @@ func _check() -> void:
 					actor._play(action, motion)
 					if direction == "left":
 						assert(actor.sprite.flip_h, "The right-facing side gait must mirror for left movement")
-					# Enhanced sheets: the four drawn poses plus four in-betweens.
-					assert(actor.sprite.sprite_frames.get_frame_count(actor.sprite.animation) == 8)
+					# Four drawn poses, four sheet in-betweens, then eight runtime in-betweens.
+					assert(actor.sprite.sprite_frames.get_frame_count(actor.sprite.animation) == 16)
 					# One steady scale per cycle (no size pulsing); its average height stays 210.
 					var scales := []
 					var heights := 0.0
-					for frame in range(8):
+					for frame in range(16):
 						actor.sprite.frame = frame
 						actor._fit_polished_frame()
 						heights += _check_frame(actor.sprite, false)
 						scales.append(actor.sprite.scale.y)
 					assert(is_equal_approx(scales.min(), scales.max()), "A run cycle must keep one scale")
-					assert(absf(heights / 8.0 - 210.0) <= 2.0, "Run cycle average height changed")
+					assert(absf(heights / 16.0 - 210.0) <= 2.0, "Run cycle average height changed")
 			if role == "Taya":
 				actor.taya_visual.play_action(&"lunge", 0)
 				actor.taya_visual._process(1.0 / 60.0)
@@ -49,8 +49,10 @@ func _check() -> void:
 
 func _check_frame(sprite: AnimatedSprite2D, exact_height: bool = true) -> float:
 	var texture: AtlasTexture = sprite.sprite_frames.get_frame_texture(sprite.animation, sprite.frame)
-	assert("/motion_polish/" in texture.atlas.resource_path)
+	# Drawn poses, or generated in-betweens packed in the inbetween atlases.
+	assert("/motion_polish/" in texture.atlas.resource_path or "/inbetween/" in texture.atlas.resource_path)
 	var bounds: Rect2i = texture.get_image().get_used_rect()
+	bounds.position += Vector2i(texture.margin.position)
 	assert(bounds.size.y > 0)
 	var foot := sprite.position.y + (float(bounds.end.y) - texture.get_size().y * 0.5) * sprite.scale.y
 	assert(absf(foot) <= 2.0, "Polished sprite feet must stay on the actor origin")

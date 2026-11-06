@@ -34,11 +34,13 @@ func _run() -> void:
 						if actor.has_method("_align_current_motion_frame"):
 							var name := String(actor.sprite.animation).trim_prefix("taya_").trim_prefix("empty_")
 							var geometry: Dictionary = actor.motion_geometry[name]
-							height = float(geometry["heights"][frame]) * actor.sprite.scale.y
+							height = (geometry["heights"].reduce(func(sum, value): return sum + float(value), 0.0) / geometry["heights"].size()) * actor.sprite.scale.y
 							foot = actor.sprite.position.y + float(geometry["canvas_height"]) * actor.sprite.scale.y * 0.5
 						else:
 							var texture: Texture2D = actor.sprite.sprite_frames.get_frame_texture(actor.sprite.animation, frame)
 							var bounds: Rect2i = texture.get_image().get_used_rect()
+							if texture is AtlasTexture:
+								bounds.position += Vector2i((texture as AtlasTexture).margin.position)
 							height = bounds.size.y * actor.sprite.scale.y
 							foot = actor.sprite.position.y + (bounds.end.y - texture.get_size().y * 0.5) * actor.sprite.scale.y
 						total_height += height
