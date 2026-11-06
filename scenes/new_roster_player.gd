@@ -219,7 +219,11 @@ func _align_current_motion_frame() -> void:
 		return
 	var geometry: Dictionary = motion_geometry[name]
 	var heights: Array = geometry["heights"]
-	var content_height: float = float(heights[mini(sprite.frame, heights.size() - 1)])
+	# One scale per animation (its average height) keeps the body a steady size;
+	# the bottom-aligned canvas keeps feet planted in every frame.
+	var content_height := 0.0
+	for value in heights: content_height += float(value)
+	content_height /= maxf(1.0, float(heights.size()))
 	var scale_factor := 210.0 / content_height
 	sprite.scale = Vector2.ONE * scale_factor
 	sprite.rotation = 0.0

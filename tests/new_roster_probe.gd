@@ -41,7 +41,11 @@ func _run() -> void:
 							body.frame = frame
 							actor._align_current_motion_frame()
 							var geometry: Dictionary = actor.motion_geometry[String(animation)]
-							var visible_height: float = body.scale.y * float(geometry["heights"][frame])
+							# One steady scale per animation: its average height is 210.
+							var average := 0.0
+							for value in geometry["heights"]: average += float(value)
+							average /= float(geometry["heights"].size())
+							var visible_height: float = body.scale.y * average
 							var foot_y: float = body.position.y + body.scale.y * float(geometry["canvas_height"]) * 0.5
 							if absf(visible_height - 210.0) > 0.2 or absf(foot_y) > 0.2:
 								problems.append("Size/ground %s %s frame %d" % [path, animation, frame])

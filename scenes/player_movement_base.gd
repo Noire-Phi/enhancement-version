@@ -161,22 +161,50 @@ func _fit_frame(target: AnimatedSprite2D, frame_index: int) -> void:
 	var texture: Texture2D = target.sprite_frames.get_frame_texture(target.animation, frame_index)
 	if texture == null:
 		return
-	var id := texture.get_instance_id()
-	if not motion_bounds.has(id):
-		motion_bounds[id] = texture.get_image().get_used_rect()
-	var bounds: Rect2i = motion_bounds[id]
-	if bounds.size.y <= 0:
+	var bounds: Rect2i = _visible_bounds(texture, motion_bounds)
+	var height := cycle_height(target.sprite_frames, target.animation, func(frame: Texture2D) -> float: return float(_visible_bounds(frame, motion_bounds).size.y))
+	if bounds.size.y <= 0 or height <= 0.0:
 		return
-	var fitted_scale := motion_visible_height / float(bounds.size.y)
+	var fitted_scale := motion_visible_height / height
 	target.scale = Vector2.ONE * fitted_scale
 	target.position = Vector2(0.0, -(float(bounds.end.y) - texture.get_size().y * 0.5) * fitted_scale)
+
+
+static func _visible_bounds(texture: Texture2D, cache: Dictionary) -> Rect2i:
+	var id := texture.get_instance_id()
+	if not cache.has(id):
+		cache[id] = texture.get_image().get_used_rect()
+	return cache[id]
+
+
+# One scale per animation, from its average visible height. Scaling each frame
+# to the same height made the body grow and shrink as legs spread and closed
+# (up to 14% within one stride); a steady size lets the drawn bob show through,
+# like a hand-animated run cycle. Feet stay planted per frame.
+var cycle_heights: Dictionary = {}
+
+func cycle_height(frames: SpriteFrames, animation: StringName, measure: Callable) -> float:
+	var key := "%d:%s" % [frames.get_instance_id(), animation]
+	if not cycle_heights.has(key):
+		var total := 0.0
+		var counted := 0
+		for index in range(frames.get_frame_count(animation)):
+			var texture := frames.get_frame_texture(animation, index)
+			var value: float = float(measure.call(texture)) if texture != null else 0.0
+			if value > 0.0:
+				total += value
+				counted += 1
+		cycle_heights[key] = total / counted if counted > 0 else 0.0
+	return float(cycle_heights[key])
 
 
 # Seamless running: most run cycles have only four drawn frames, so blend each
 # frame into the next and add a light stride bounce and forward lean. Local
 # presentation only; every peer computes it from the sprite it already shows.
 const STEP_BLEND := 0.55
-const STRIDE_BOUNCE := {"walk": 3.0, "sprint": 6.0}
+# Lowest on foot contact, highest mid-stride; kept light because the drawn
+# poses now carry their own bob at a steady scale (see cycle_height).
+const STRIDE_BOUNCE := {"walk": 2.0, "sprint": 4.0}
 const RUN_LEAN := 0.09
 var step_blend: AnimatedSprite2D
 

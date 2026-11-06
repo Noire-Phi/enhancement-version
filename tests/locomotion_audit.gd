@@ -20,6 +20,9 @@ func _run() -> void:
 					actor._play(action, vector)
 					var count: int = actor.sprite.sprite_frames.get_frame_count(actor.sprite.animation)
 					assert(count >= 1, "%s %s %s %s has no frames" % [character, role, action, direction])
+					# Each animation keeps one scale; its average height is 210 and feet stay planted.
+					var total_height := 0.0
+					var scales := []
 					for frame in range(count):
 						actor.sprite.frame = frame
 						if actor.has_method("_fit_polished_frame"):
@@ -38,8 +41,11 @@ func _run() -> void:
 							var bounds: Rect2i = texture.get_image().get_used_rect()
 							height = bounds.size.y * actor.sprite.scale.y
 							foot = actor.sprite.position.y + (bounds.end.y - texture.get_size().y * 0.5) * actor.sprite.scale.y
-						assert(absf(height - 210.0) < 0.5, "%s %s %s %s frame %d height %.1f" % [character, role, action, direction, frame, height])
+						total_height += height
+						scales.append(actor.sprite.scale.y)
 						assert(absf(foot) < 0.5, "%s %s %s %s frame %d foot %.1f" % [character, role, action, direction, frame, foot])
+					assert(is_equal_approx(scales.min(), scales.max()), "%s %s %s %s changes scale mid-cycle" % [character, role, action, direction])
+					assert(absf(total_height / count - 210.0) < 0.5, "%s %s %s %s average height %.1f" % [character, role, action, direction, total_height / count])
 			actor.free()
-		print("PASS: %s idle, walk and sprint match 210-pixel height and foot origin in eight directions and both roles" % character)
+		print("PASS: %s idle, walk and sprint keep one scale, a 210-pixel average height and foot origin in eight directions and both roles" % character)
 	quit()

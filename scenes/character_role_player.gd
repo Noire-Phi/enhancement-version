@@ -147,13 +147,12 @@ func _fit_polished_frame() -> void:
 	var texture: Texture2D = sprite.sprite_frames.get_frame_texture(sprite.animation, sprite.frame)
 	if not texture is AtlasTexture:
 		return
-	var id := texture.get_instance_id()
-	if not polished_bounds.has(id):
-		polished_bounds[id] = texture.get_image().get_used_rect()
-	var bounds: Rect2i = polished_bounds[id]
-	if bounds.size.y <= 0:
+	var bounds: Rect2i = _visible_bounds(texture, polished_bounds)
+	# Steady size across the cycle (see cycle_height); feet still planted per frame.
+	var height := cycle_height(sprite.sprite_frames, sprite.animation, func(frame: Texture2D) -> float: return float(_visible_bounds(frame, polished_bounds).size.y) if frame is AtlasTexture else 0.0)
+	if bounds.size.y <= 0 or height <= 0.0:
 		return
-	var fitted_scale := POLISHED_HEIGHT / float(bounds.size.y)
+	var fitted_scale := POLISHED_HEIGHT / height
 	sprite.scale = Vector2.ONE * fitted_scale
 	sprite.position = Vector2(0.0, -(float(bounds.end.y) - texture.get_size().y * 0.5) * fitted_scale)
 
