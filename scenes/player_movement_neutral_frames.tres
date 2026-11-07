@@ -426,42 +426,42 @@ filter_clip = true
 
 [sub_resource type="AtlasTexture" id="frame_walk_diagonal_0_0"]
 atlas = ExtResource("4_walk_diagonal")
-region = Rect2(0, 6, 284, 270)
+region = Rect2(0, 6, 284, 285)
 filter_clip = true
 
 [sub_resource type="AtlasTexture" id="frame_walk_diagonal_mid_0_0"]
 atlas = ExtResource("6_walk_diagonal_mid")
-region = Rect2(0, 11, 284, 270)
+region = Rect2(0, 11, 284, 285)
 filter_clip = true
 
 [sub_resource type="AtlasTexture" id="frame_walk_diagonal_0_1"]
 atlas = ExtResource("4_walk_diagonal")
-region = Rect2(284, 6, 284, 270)
+region = Rect2(284, 6, 284, 285)
 filter_clip = true
 
 [sub_resource type="AtlasTexture" id="frame_walk_diagonal_mid_0_1"]
 atlas = ExtResource("6_walk_diagonal_mid")
-region = Rect2(284, 11, 284, 270)
+region = Rect2(284, 11, 284, 285)
 filter_clip = true
 
 [sub_resource type="AtlasTexture" id="frame_walk_diagonal_0_2"]
 atlas = ExtResource("4_walk_diagonal")
-region = Rect2(568, 6, 284, 270)
+region = Rect2(568, 6, 284, 285)
 filter_clip = true
 
 [sub_resource type="AtlasTexture" id="frame_walk_diagonal_mid_0_2"]
 atlas = ExtResource("6_walk_diagonal_mid")
-region = Rect2(568, 11, 284, 270)
+region = Rect2(568, 11, 284, 285)
 filter_clip = true
 
 [sub_resource type="AtlasTexture" id="frame_walk_diagonal_0_3"]
 atlas = ExtResource("4_walk_diagonal")
-region = Rect2(852, 6, 284, 270)
+region = Rect2(852, 6, 284, 285)
 filter_clip = true
 
 [sub_resource type="AtlasTexture" id="frame_walk_diagonal_mid_0_3"]
 atlas = ExtResource("6_walk_diagonal_mid")
-region = Rect2(852, 11, 284, 270)
+region = Rect2(852, 11, 284, 285)
 filter_clip = true
 
 [sub_resource type="AtlasTexture" id="frame_walk_diagonal_3_0"]

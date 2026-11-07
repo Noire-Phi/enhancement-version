@@ -34,25 +34,43 @@ def spans(values: np.ndarray, minimum: int) -> list[tuple[int, int]]:
     return [(int(group[0]), int(group[-1]) + 1) for group in groups if len(group) >= minimum]
 
 
+def grown(found: list[tuple[int, int]], present: np.ndarray) -> list[tuple[int, int, int, int]]:
+    """Widen each span over its thin tips (lines with only a few drawn pixels, such as a
+    hair spike or fingertip) up to the first empty line, so a region never clips them.
+    Returns (start, end, low limit, high limit): padding must stay between the neighbours."""
+    out = []
+    for index, (start, end) in enumerate(found):
+        low = found[index - 1][1] if index > 0 else 0
+        high = found[index + 1][0] if index + 1 < len(found) else len(present)
+        while start > low and present[start - 1]:
+            start -= 1
+        while end < high and present[end]:
+            end += 1
+        out.append((start, end, low, high))
+    return out
+
+
 def regions(path: Path, expected_rows: int = 4, expected_columns: int = 4) -> dict:
     alpha = np.asarray(Image.open(path).convert("RGBA"), dtype=np.uint8)[:, :, 3]
     rows = spans(np.count_nonzero(alpha > 10, axis=1) > 8, 100)
     if len(rows) != expected_rows:
         raise ValueError(f"{path}: expected {expected_rows} rows, found {rows}")
+    rows = grown(rows, (alpha > 10).any(axis=1))
     cells = []
-    for top, bottom in rows:
-        columns = spans(np.count_nonzero(alpha[top:bottom] > 10, axis=0) > 5, 100)
+    for top, bottom, top_limit, bottom_limit in rows:
+        band = alpha[top:bottom] > 10
+        columns = spans(np.count_nonzero(band, axis=0) > 5, 100)
         if len(columns) != expected_columns:
             raise ValueError(f"{path}: expected {expected_columns} cells in row {top}, found {columns}")
         cell_row = []
-        for left, right in columns:
-            opaque = np.argwhere(alpha[top:bottom, left:right] > 10)
+        for left, right, left_limit, right_limit in grown(columns, band.any(axis=0)):
+            opaque = np.argwhere(band[:, left:right])
             y0, x0 = opaque.min(axis=0)
             y1, x1 = opaque.max(axis=0) + 1
-            x = max(left, left + int(x0) - 2)
-            y = max(top, top + int(y0) - 2)
-            w = min(right, left + int(x1) + 2) - x
-            h = min(bottom, top + int(y1) + 2) - y
+            x = max(left_limit, left + int(x0) - 2)
+            y = max(top_limit, top + int(y0) - 2)
+            w = min(right_limit, left + int(x1) + 2) - x
+            h = min(bottom_limit, top + int(y1) + 2) - y
             cell_row.append([x, y, w, h])
         cells.append(cell_row)
     return {"canvas": [max(cell[2] for row in cells for cell in row),
